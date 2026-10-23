@@ -108,5 +108,25 @@
     "duration_ms": 3739,
     "proof_hmac": "8da76889012a717c06f2c4702326c14d42432346c40dbea8fa4e06321ff6162f",
     "status": "VERIFIED"
+  },
+  {
+    "run_id": "RUN-0012",
+    "timestamp": "2026-10-23T15:50:34.632Z",
+    "command": "npm test",
+    "tree_hash": "360271b32973a0e56b35b28dfacb75b96d03be4eb5cc079cbd688d6625faf2c5",
+    "stdout_hash": "3fdb7a67fa43ecea74650ae9a4ca60390da9fa4601e1ad04f004664f4c74a6b1",
+    "duration_ms": 3710,
+    "proof_hmac": "058cb0c85e7a430a1f24fbc21f0a8df080f673bf0a1f99b372758b625531aae6",
+    "status": "VERIFIED"
+  },
+  {
+    "run_id": "RUN-0013",
+    "timestamp": "2026-10-23T15:50:53.811Z",
+    "command": "npm test",
+    "tree_hash": "360271b32973a0e56b35b28dfacb75b96d03be4eb5cc079cbd688d6625faf2c5",
+    "stdout_hash": "b6fffb7f3e96520ddf462b920da7345e5e799db009b21e937d0b2658f994947a",
+    "duration_ms": 3767,
+    "proof_hmac": "5cc16a30105148a1dc7c4101a8c2849a785a1aec17da1340316f1a33d69d607d",
+    "status": "VERIFIED"
   }
 ]

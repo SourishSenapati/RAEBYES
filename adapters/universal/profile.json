@@ -1,0 +1,35 @@
+{
+  "name": "raebyes-universal-model-profile",
+  "version": "3.0.0",
+  "description": "Universal deterministic execution profile compatible with any model across the globe (frontier foundation lab models, undisclosed checkpoints, custom fine-tunes, and edge reasoning weights)",
+  "target_models": [
+    "*",
+    "custom:*",
+    "inhouse:*",
+    "lab-checkpoint:*"
+  ],
+  "exoskeleton": {
+    "ast_slice_token_budget": 350,
+    "max_symbols_per_turn": 1,
+    "max_files_per_turn": 1,
+    "step_lock_enforced": true,
+    "grammar_sanitizer_enabled": true,
+    "strip_reasoning_think_tags": true,
+    "anti_reward_tamper_active": true,
+    "best_of_n_candidates": 4,
+    "verification_timeout_sec": 60
+  },
+  "runtime_options": {
+    "temperature": 0.2,
+    "top_p": 0.95,
+    "num_ctx": 65536,
+    "repeat_penalty": 1.1
+  },
+  "system_instruction_file": ".agent/rules/raebyes-cortex.md",
+  "circuit_breaker": {
+    "max_identical_tool_calls": 3,
+    "max_consecutive_failures": 3,
+    "freshness_window_ms": 120000,
+    "fatal_exit_code": 137
+  }
+}

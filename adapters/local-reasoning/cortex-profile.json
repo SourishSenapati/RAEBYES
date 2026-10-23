@@ -1,17 +1,12 @@
 {
-  "name": "raebyes-frontier-and-local-reasoning-profile",
-  "version": "2.0.0",
+  "name": "raebyes-universal-reasoning-profile",
+  "version": "3.0.0",
+  "description": "Universal profile for any model, architecture, or custom lab checkpoint",
   "target_models": [
-    "glm-5.3",
-    "gpt-6",
-    "claude-5.5",
-    "deepseek-v4",
-    "deepseek-r2",
-    "llama-4",
-    "qwen3.5-coder",
-    "gemini-3.0-ultra",
-    "deepseek-r1:70b",
-    "qwen3"
+    "*",
+    "custom:*",
+    "inhouse:*",
+    "lab-checkpoint:*"
   ],
   "exoskeleton": {
     "ast_slice_token_budget": 350,
@@ -22,12 +17,12 @@
     "strip_reasoning_think_tags": true,
     "anti_reward_tamper_active": true,
     "best_of_n_candidates": 4,
-    "verification_timeout_sec": 45
+    "verification_timeout_sec": 60
   },
   "runtime_options": {
     "temperature": 0.2,
     "top_p": 0.95,
-    "num_ctx": 32768,
+    "num_ctx": 65536,
     "repeat_penalty": 1.1
   },
   "system_instruction_file": ".agent/rules/raebyes-cortex.md",

@@ -1,0 +1,34 @@
+{
+  "name": "raebyes-cortex-4b-profile",
+  "version": "1.0.0",
+  "target_models": [
+    "qwen2.5-coder:3b",
+    "qwen2.5-coder:7b",
+    "deepseek-coder:6.7b",
+    "llama-3.2-3b-instruct",
+    "mistral-7b-instruct",
+    "phi-3.5-mini-instruct"
+  ],
+  "exoskeleton": {
+    "ast_slice_token_budget": 350,
+    "max_symbols_per_turn": 1,
+    "max_files_per_turn": 1,
+    "step_lock_enforced": true,
+    "grammar_sanitizer_enabled": true,
+    "best_of_n_candidates": 4,
+    "verification_timeout_sec": 45
+  },
+  "ollama_options": {
+    "temperature": 0.2,
+    "top_p": 0.95,
+    "num_ctx": 4096,
+    "repeat_penalty": 1.1
+  },
+  "system_instruction_file": ".agent/rules/raebyes-cortex.md",
+  "circuit_breaker": {
+    "max_identical_tool_calls": 3,
+    "max_consecutive_failures": 3,
+    "freshness_window_ms": 120000,
+    "fatal_exit_code": 137
+  }
+}

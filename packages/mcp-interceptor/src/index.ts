@@ -1,6 +1,7 @@
 import * as readline from 'readline';
 import * as url from 'url';
 import * as path from 'path';
+import { GrammarSanitizer } from '@raebyes/daemon';
 import { McpStdioProxy, JsonRpcRequest } from './stdio-proxy.js';
 
 export * from './freshness-lock.js';
@@ -17,17 +18,30 @@ export function startMcpServer(workspaceDir = process.cwd(), childCommand?: stri
 
   rl.on('line', async (line) => {
     if (!line.trim()) return;
-    try {
-      const req: JsonRpcRequest = JSON.parse(line);
-      const res = await proxy.processRequest(req);
-      process.stdout.write(JSON.stringify(res) + '\n');
-    } catch (err) {
+    const sanitized = GrammarSanitizer.sanitizeJson<JsonRpcRequest>(line);
+    if (!sanitized.success || !sanitized.data) {
       const errRes = {
         jsonrpc: '2.0',
         id: null,
         error: {
           code: -32700,
-          message: `Parse error: ${err instanceof Error ? err.message : String(err)}`
+          message: sanitized.error || 'Parse error: Malformed JSON syntax'
+        }
+      };
+      process.stdout.write(JSON.stringify(errRes) + '\n');
+      return;
+    }
+
+    try {
+      const res = await proxy.processRequest(sanitized.data);
+      process.stdout.write(JSON.stringify(res) + '\n');
+    } catch (err) {
+      const errRes = {
+        jsonrpc: '2.0',
+        id: sanitized.data?.id || null,
+        error: {
+          code: -32000,
+          message: `Execution error: ${err instanceof Error ? err.message : String(err)}`
         }
       };
       process.stdout.write(JSON.stringify(errRes) + '\n');

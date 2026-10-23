@@ -7,7 +7,10 @@ import {
   CoreHubGraph,
   SpasmCircuitBreaker,
   AntibodyLedger,
-  TruthEnforcer
+  TruthEnforcer,
+  AstSlicer,
+  StepLockFSM,
+  RepairSynthesizer
 } from '@raebyes/daemon';
 
 export interface JsonRpcRequest {
@@ -39,6 +42,8 @@ export class McpStdioProxy {
   private breaker: SpasmCircuitBreaker;
   private ledger: AntibodyLedger;
   private truthEnforcer: TruthEnforcer;
+  private astSlicer: AstSlicer;
+  private stepLock: StepLockFSM;
   private childMcpProcess: child_process.ChildProcess | null = null;
 
   constructor(workspaceDir = process.cwd(), childCommand?: string[]) {
@@ -49,6 +54,8 @@ export class McpStdioProxy {
     this.breaker = new SpasmCircuitBreaker({ workspaceDir: this.workspaceDir });
     this.ledger = new AntibodyLedger(this.workspaceDir);
     this.truthEnforcer = new TruthEnforcer(this.workspaceDir);
+    this.astSlicer = new AstSlicer(this.workspaceDir);
+    this.stepLock = new StepLockFSM(true);
 
     const lockPath = path.join(this.workspaceDir, '.raebyes', 'graph.lock');
     this.coreHubGraph.loadLockfile(lockPath);
@@ -143,6 +150,19 @@ export class McpStdioProxy {
         inputSchema: {
           type: 'object',
           properties: {}
+        }
+      },
+      {
+        name: 'raebyes_slice',
+        description: 'Cortex AST micro-slicer: extracts targeted symbol (<350 tokens) with imports and linked antibodies.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            filePath: { type: 'string', description: 'Relative path to source file' },
+            symbolName: { type: 'string', description: 'Name of function, method, or class' },
+            lineHint: { type: 'number', description: 'Optional line number hint' }
+          },
+          required: ['filePath', 'symbolName']
         }
       },
       {
@@ -345,6 +365,14 @@ export class McpStdioProxy {
         });
       }
 
+      case 'raebyes_slice': {
+        const { filePath, symbolName, lineHint } = args;
+        const slice = this.astSlicer.sliceSymbol(filePath, symbolName, lineHint);
+        this.stepLock.onSliceRead(filePath, symbolName);
+        this.hydrophobia.recordRead(filePath);
+        return ErrorInjector.createSuccessResponse(slice);
+      }
+
       default:
         // Forward to child MCP if available
         if (this.childMcpProcess) {
@@ -354,13 +382,14 @@ export class McpStdioProxy {
     }
   }
 
-  private formatSpasmBreach(breachId: string, reason: string) {
+  private formatSpasmBreach(breachId: string, reason: string, context?: { file?: string; symbol?: string }) {
+    const repair = RepairSynthesizer.synthesize(reason, undefined, context || this.stepLock.getActiveContext());
     return {
       isError: true,
       content: [
         {
           type: 'text' as const,
-          text: `[RAEBYES_SPASM_BREACH: ${breachId}] Deterministic Circuit Breaker blocked shortcut/violation (${reason}). File write refused. You must implement the authentic solution without mocks, shortcuts, or blind edits.`
+          text: `[RAEBYES_SPASM_BREACH: ${breachId}] Deterministic Circuit Breaker blocked shortcut/violation (${reason}).\n\n${repair.formattedBlock}\n\nFile write refused. You must implement the authentic solution without mocks, shortcuts, or blind edits.`
         }
       ]
     };

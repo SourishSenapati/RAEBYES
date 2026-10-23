@@ -7,6 +7,7 @@ export async function runSpawn(options: {
   workspaceDir?: string;
   socketPath?: string;
   hydrophobic?: boolean;
+  cortex4b?: boolean;
   foreground?: boolean;
 }) {
   const ws = path.resolve(options.workspaceDir || process.cwd());
@@ -24,7 +25,7 @@ export async function runSpawn(options: {
   }
 
   console.log(`[RAEBYES SPAWN] Launching raebyesd daemon on socket: ${socketPath}`);
-  console.log(`[RAEBYES SPAWN] Mode: ${options.hydrophobic ? 'HYDROPHOBIC (Aggressive Spasm)' : 'STANDARD'}`);
+  console.log(`[RAEBYES SPAWN] Mode: ${options.hydrophobic ? 'HYDROPHOBIC (Aggressive Spasm)' : 'STANDARD'}${options.cortex4b ? ' + CORTEX-4B EXOSKELETON' : ''}`);
 
   // Locate raebyesd binary
   const currentDir = path.dirname(url.fileURLToPath(import.meta.url));
@@ -33,6 +34,9 @@ export async function runSpawn(options: {
   const args = [daemonPath, '--workspace', ws, '--socket', socketPath];
   if (options.hydrophobic) {
     args.push('--hydrophobic');
+  }
+  if (options.cortex4b) {
+    args.push('--cortex-4b');
   }
 
   if (options.foreground) {

@@ -12,6 +12,8 @@ import { runVerify } from './commands/verify.js';
 import { runStatus } from './commands/status.js';
 import { runAuth } from './commands/auth.js';
 import { runDecision } from './commands/decision.js';
+import { runSlice } from './commands/slice.js';
+import { runTournament } from './commands/tournament.js';
 
 export function printHelp() {
   console.log(`
@@ -27,9 +29,12 @@ USAGE:
 COMMANDS:
   init                     Scaffold .raebyes/ vault, binary shims, and agent Stop-hooks
   spawn                    Start detached raebyesd background watchdog daemon
-                           Options: [--hydrophobic] [--foreground]
+                           Options: [--hydrophobic] [--cortex-4b] [--foreground]
   exec -- <cmd>            Pre-flight regression gate; replays antibodies & mints RUN-XXXX proof
   verify-turn              Stop-hook lie detector: blocks turn conclusion (exit 2) if unverified
+  slice <file> <symbol>    Cortex AST micro-slicer: extracts targeted function under 350 tokens
+  tournament <file>        Runs N parallel candidate patches in git worktrees & picks winner
+                           Options: --cmd "<verify_cmd>" --patches <patch1> <patch2> ...
   immunize                 Append new failure antibody with SHA-256 chain (ABY-XXXX)
                            Options: --desc "<desc>" --pattern "<regex/js>" [--comp "<name>"]
   quarantine               Trip all circuit breakers immediately to OPEN & lock workspace
@@ -41,11 +46,11 @@ COMMANDS:
 
 EXAMPLES:
   raebyes init
-  raebyes spawn --hydrophobic
+  raebyes spawn --hydrophobic --cortex-4b
+  raebyes slice src/core/solver.ts solveNavierStokes
+  raebyes tournament src/core/solver.ts --cmd "pnpm test" --patches p1.ts p2.ts
   raebyes exec -- npm test
   raebyes verify-turn
-  raebyes immunize --desc "ERR-004 Untreated whistles" --pattern "untreated_whistles < 12"
-  raebyes replay
   raebyes status
 =============================================================================
 `);
@@ -75,8 +80,19 @@ export async function main() {
 
       case 'spawn': {
         const hydrophobic = args.includes('--hydrophobic');
+        const cortex4b = args.includes('--cortex-4b');
         const foreground = args.includes('--foreground');
-        await runSpawn({ hydrophobic, foreground });
+        await runSpawn({ hydrophobic, cortex4b, foreground });
+        break;
+      }
+
+      case 'slice': {
+        await runSlice(args.slice(1));
+        break;
+      }
+
+      case 'tournament': {
+        await runTournament(args.slice(1));
         break;
       }
 

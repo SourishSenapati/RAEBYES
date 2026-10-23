@@ -19,6 +19,11 @@ export { SpasmCircuitBreaker } from './engine/spasm-breaker.js';
 export { TruthEnforcer } from './engine/truth-enforcer.js';
 export { VaultHealer } from './engine/vault-healer.js';
 export { RaebyesSocketServer, getDefaultSocketPath, sendDaemonCommand } from './ipc/socket-server.js';
+export { AstSlicer } from './cortex/ast-slicer.js';
+export { StepLockFSM } from './cortex/step-lock-fsm.js';
+export { WorktreeTournament } from './cortex/worktree-tournament.js';
+export { GrammarSanitizer } from './cortex/grammar-sanitizer.js';
+export { RepairSynthesizer } from './cortex/repair-synthesizer.js';
 
 // CLI Execution check: only execute if invoked directly as the daemon binary
 const isMain = Boolean(
@@ -35,6 +40,7 @@ if (isMain) {
   let workspaceDir = process.cwd();
   let customSocket: string | undefined;
   let hydrophobicMode = false;
+  let cortex4bMode = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--workspace' && args[i + 1]) {
@@ -45,6 +51,8 @@ if (isMain) {
       i++;
     } else if (args[i] === '--hydrophobic') {
       hydrophobicMode = true;
+    } else if (args[i] === '--cortex-4b') {
+      cortex4bMode = true;
     }
   }
 

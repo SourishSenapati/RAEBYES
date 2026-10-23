@@ -95,3 +95,54 @@ export interface ToolCallLog {
   timestamp: number;
   treeHash?: string;
 }
+
+export interface AstSliceResult {
+  filePath: string;
+  symbolName: string;
+  startLine: number;
+  endLine: number;
+  imports: string[];
+  code: string;
+  linkedAntibodies: AntibodyEntry[];
+  tokenEstimate: number;
+}
+
+export type StepLockState = 'REQUIRE_SLICE_READ' | 'ALLOW_SINGLE_SYMBOL_PATCH' | 'REQUIRE_EXEC_VERIFY';
+
+export interface StepLockReport {
+  state: StepLockState;
+  activeFile?: string;
+  activeSymbol?: string;
+  allowedAction: 'SLICE' | 'PATCH' | 'VERIFY';
+  message: string;
+}
+
+export interface TournamentCandidate {
+  id: string;
+  patch: string;
+  passedCompilation: boolean;
+  passedAntibodies: boolean;
+  passedInvariants: boolean;
+  varianceResult?: VarianceCheckResult;
+  astDiffSize: number;
+  score: number;
+  error?: string;
+}
+
+export interface TournamentResult {
+  winner?: TournamentCandidate;
+  candidates: TournamentCandidate[];
+  runReceipt?: RunReceipt;
+  status: 'WON' | 'ALL_FAILED';
+  applied: boolean;
+}
+
+export type InvariantCheck = (output: string) => boolean;
+
+export interface SynthesizedRepair {
+  faultLocation: string;
+  violatedInvariant: string;
+  forbiddenShortcut: string;
+  requiredFixShape: string;
+  formattedBlock: string;
+}

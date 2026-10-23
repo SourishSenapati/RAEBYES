@@ -11,7 +11,12 @@ import {
   CoreHubGraph,
   SpasmCircuitBreaker,
   TruthEnforcer,
-  VaultHealer
+  VaultHealer,
+  AstSlicer,
+  StepLockFSM,
+  WorktreeTournament,
+  GrammarSanitizer,
+  RepairSynthesizer
 } from '../daemons/raebyesd/dist/index.js';
 import { Raebyes, RaebyesSpasmError } from '../packages/sdk-js/dist/index.js';
 import { McpStdioProxy } from '../packages/mcp-interceptor/dist/index.js';
@@ -216,4 +221,143 @@ test('7. McpStdioProxy: Tool call interception and deterministic SPASM error inj
   assert.ok(res.content[0].text.includes('BLIND EDIT REJECTED'));
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('8. AstSlicer: Extracts targeted function, imports, and linked antibodies under token budget', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'raebyes-slice-'));
+  const testFile = path.join(tmpDir, 'solver.ts');
+  const code = `
+import { matrixMultiply } from './math.js';
+import { StateVector } from './types.js';
+
+export function unrelatedHelper() {
+  return 'noisy context that small models should not see';
+}
+
+export function solveNavierStokes(input: StateVector): StateVector {
+  const step1 = matrixMultiply(input.data);
+  return { data: step1, converged: true };
+}
+
+export function anotherUnrelatedLargeFunction() {
+  return Array.from({ length: 1000 }, (_, i) => i);
+}
+`;
+  fs.writeFileSync(testFile, code, 'utf-8');
+
+  const slicer = new AstSlicer(tmpDir);
+  const slice = slicer.sliceSymbol('solver.ts', 'solveNavierStokes');
+
+  assert.strictEqual(slice.symbolName, 'solveNavierStokes');
+  assert.ok(slice.code.includes('solveNavierStokes(input: StateVector)'));
+  assert.ok(!slice.code.includes('anotherUnrelatedLargeFunction'));
+  assert.ok(slice.imports.some((imp: string) => imp.includes('matrixMultiply')));
+  assert.ok(slice.tokenEstimate < 350);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('9. StepLockFSM: Enforces 1-function state machine and blocks scope overflow', () => {
+  const fsm = new StepLockFSM(true); // Cortex-4B mode enabled
+  assert.strictEqual(fsm.getState(), 'REQUIRE_SLICE_READ');
+
+  // Attempt to patch before slicing -> blocked
+  const prePatchBlocked = fsm.onPrePatch('src/solver.ts', 1);
+  assert.strictEqual(prePatchBlocked.allowed, false);
+  assert.ok(prePatchBlocked.reason?.includes('ERR_STEP_LOCK_BLIND_PATCH'));
+
+  // Arm with slice read
+  const sliceReport = fsm.onSliceRead('src/solver.ts', 'solveNavierStokes');
+  assert.strictEqual(sliceReport.state, 'ALLOW_SINGLE_SYMBOL_PATCH');
+  assert.strictEqual(fsm.getState(), 'ALLOW_SINGLE_SYMBOL_PATCH');
+
+  // Attempt multi-function edit (>1 symbol) -> blocked with ERR_SCOPE_OVERFLOW
+  const multiBlocked = fsm.onPrePatch('src/solver.ts', 3);
+  assert.strictEqual(multiBlocked.allowed, false);
+  assert.ok(multiBlocked.reason?.includes('ERR_SCOPE_OVERFLOW'));
+
+  // Attempt cross-file edit -> blocked
+  const crossBlocked = fsm.onPrePatch('src/other.ts', 1);
+  assert.strictEqual(crossBlocked.allowed, false);
+  assert.ok(crossBlocked.reason?.includes('ERR_SCOPE_OVERFLOW'));
+
+  // Valid single function patch -> allowed, transitions to REQUIRE_EXEC_VERIFY
+  const validPatch = fsm.onPrePatch('src/solver.ts', 1);
+  assert.strictEqual(validPatch.allowed, true);
+  assert.strictEqual(fsm.getState(), 'REQUIRE_EXEC_VERIFY');
+
+  // Attempt another patch while verify pending -> blocked
+  const secondPatchBlocked = fsm.onPrePatch('src/solver.ts', 1);
+  assert.strictEqual(secondPatchBlocked.allowed, false);
+  assert.ok(secondPatchBlocked.reason?.includes('ERR_STEP_LOCK_VERIFY_PENDING'));
+
+  // On successful execution verification -> returns to REQUIRE_SLICE_READ
+  const verifiedReport = fsm.onExecVerified();
+  assert.strictEqual(verifiedReport.state, 'REQUIRE_SLICE_READ');
+});
+
+test('10. WorktreeTournament: Best-of-N evaluator rejects shortcuts/syntax errors and selects genuine patch', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'raebyes-tourn-test-'));
+  const targetFile = path.join(tmpDir, 'algo.js');
+  fs.writeFileSync(targetFile, 'function solve() { return 0; }\nmodule.exports = { solve };\n', 'utf-8');
+
+  // Candidates:
+  // Candidate 1: Hydrophobia shortcut (TODO: stub, mock return true)
+  const candidateShortcut = 'function solve() { return true; /* TODO: stub */ }\nmodule.exports = { solve };\n';
+  // Candidate 2: Syntax error
+  const candidateBroken = 'function solve() { const = syntax error;\n';
+  // Candidate 3: Genuine passing solution with real computation
+  const candidateGenuine = `function solve(base = 40) {
+  let acc = base;
+  for (let i = 0; i < 2; i++) {
+    acc += 1;
+  }
+  return acc;
+}
+module.exports = { solve };
+`;
+
+  const verifyCmd = 'node -e "const { solve } = require(\'./algo.js\'); if (solve() !== 42) process.exit(1);"';
+
+  const tournament = new WorktreeTournament(tmpDir);
+  const result = await tournament.runTournament(
+    'algo.js',
+    [candidateShortcut, candidateBroken, candidateGenuine],
+    verifyCmd
+  );
+
+  assert.strictEqual(result.status, 'WON');
+  assert.strictEqual(result.applied, true);
+  assert.strictEqual(result.winner?.id, 'CANDIDATE-3');
+  assert.strictEqual(result.winner?.passedAntibodies, true);
+  assert.strictEqual(result.winner?.passedCompilation, true);
+
+  // Candidate 1 should have failed antibodies/hydrophobia
+  assert.strictEqual(result.candidates[0].passedAntibodies, false);
+  // Candidate 2 should have failed compilation
+  assert.strictEqual(result.candidates[1].passedCompilation, false);
+
+  // Check that algo.js in main working tree was atomically updated to candidate 3
+  const finalContent = fs.readFileSync(targetFile, 'utf-8');
+  assert.ok(finalContent.includes('return acc;'));
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('11. GrammarSanitizer & RepairSynthesizer: Repairs malformed JSON and synthesizes 4-line repair specs', () => {
+  // GrammarSanitizer tests
+  const malformedInput = '```json\n{\n  method: \'tools/call\',\n  arguments: { code: "line1\\nline2", },\n}\n```';
+  const sanitized = GrammarSanitizer.sanitizeJson<{ method: string; arguments: { code: string } }>(malformedInput);
+  assert.strictEqual(sanitized.success, true);
+  assert.strictEqual(sanitized.data?.method, 'tools/call');
+
+  // RepairSynthesizer tests
+  const rawTrace = 'AssertionError [ERR_ASSERTION]: Expected: 42 Received: true\n    at solveNavierStokes (d:/PROJECT/src/solver.ts:45:12)';
+  const repair = RepairSynthesizer.synthesize(rawTrace, undefined, { file: 'src/solver.ts', symbol: 'solveNavierStokes' });
+
+  assert.ok(repair.formattedBlock.includes('[FAULT_LOCATION]:'));
+  assert.ok(repair.formattedBlock.includes('[VIOLATED_INVARIANT]:'));
+  assert.ok(repair.formattedBlock.includes('[FORBIDDEN_SHORTCUT]:'));
+  assert.ok(repair.formattedBlock.includes('[REQUIRED_FIX_SHAPE]:'));
+  assert.ok(repair.faultLocation.includes('src/solver.ts:45 in solveNavierStokes'));
 });

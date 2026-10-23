@@ -1,5 +1,6 @@
 import * as child_process from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as url from 'url';
 import { sendDaemonCommand, getDefaultSocketPath } from '@raebyes/daemon';
 
@@ -27,9 +28,36 @@ export async function runSpawn(options: {
   console.log(`[RAEBYES SPAWN] Launching raebyesd daemon on socket: ${socketPath}`);
   console.log(`[RAEBYES SPAWN] Mode: ${options.hydrophobic ? 'HYDROPHOBIC (Aggressive Spasm)' : 'STANDARD'}${options.cortex4b ? ' + CORTEX-4B EXOSKELETON' : ''}`);
 
-  // Locate raebyesd binary
+  // Robust dynamic daemon binary resolution
   const currentDir = path.dirname(url.fileURLToPath(import.meta.url));
-  const daemonPath = path.resolve(currentDir, '../../../../daemons/raebyesd/dist/index.js');
+  const candidatePaths = [
+    path.resolve(currentDir, '../../../../daemons/raebyesd/dist/index.js'),
+    path.resolve(currentDir, '../../../daemons/raebyesd/dist/index.js'),
+    path.resolve(currentDir, '../../daemon/dist/index.js'),
+    path.resolve(ws, 'node_modules/@raebyes/daemon/dist/index.js'),
+    path.resolve(currentDir, '../../../../node_modules/@raebyes/daemon/dist/index.js')
+  ];
+
+  let daemonPath: string | undefined;
+  for (const c of candidatePaths) {
+    if (fs.existsSync(c)) {
+      daemonPath = c;
+      break;
+    }
+  }
+
+  if (!daemonPath) {
+    try {
+      const resolved = url.fileURLToPath(import.meta.resolve('@raebyes/daemon'));
+      if (fs.existsSync(resolved)) daemonPath = resolved;
+    } catch {
+      // Ignore resolution error
+    }
+  }
+
+  if (!daemonPath) {
+    daemonPath = path.resolve(currentDir, '../../../../daemons/raebyesd/dist/index.js');
+  }
 
   const args = [daemonPath, '--workspace', ws, '--socket', socketPath];
   if (options.hydrophobic) {

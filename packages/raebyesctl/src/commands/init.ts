@@ -107,7 +107,30 @@ CRITICAL OPERATIONAL RULES:
 5. PROOF-OF-EXECUTION MANDATE: Every turn concluding code modifications MUST execute the verified command via 'raebyesctl exec' to mint a cryptographic RUN-XXXX receipt. If you attempt to conclude without a matching RUN-XXXX receipt, the Stop hook will reject your turn with code 2.
 `;
   fs.writeFileSync(rulesPath, rulesContent, 'utf-8');
-  console.log(`  + Injected Agent Hydrophobia rules: .agent/rules/raebyes-hydrophobia.md`);
+
+  // Cortex 4-step micro-loop rules
+  const cortexRulesPath = path.join(agentRulesDir, 'raebyes-cortex.md');
+  const cortexRulesContent = `# RAEBYES DETERMINISTIC EXECUTION PROTOCOL (ACTIVE DAEMON: raebyesd)
+
+You are operating inside a raebyesd hardware-enforced execution sandbox.
+- You CANNOT finish your turn without a cryptographic RUN-XXXX receipt matching the current git tree hash (raebyesctl verify-turn will block your output with exit code 2).
+- You CANNOT edit a file without reading its slice within the last 120 seconds (ERR_BLIND_EDIT).
+- You CANNOT delete assertions, hardcode constants, stub functions (TODO/pass), or return zero-variance arrays (ERR_HYDROPHOBIA_SPASM).
+
+MANDATORY 4-STEP MICRO-LOOP (EXECUTE ONE FUNCTION AT A TIME):
+1. SLICE: Run 'raebyesctl slice <file_path> <symbol_name>'
+2. PATCH: Modify ONLY the single target function identified in Step 1.
+3. VERIFY: Run 'raebyesctl exec -- <test_or_solver_command>' to mint RUN-XXXX receipt.
+4. PROVE: Cite RAEBYES_PROOF[RUN-XXXX:<hmac>:VERIFIED] on final line.
+`;
+  fs.writeFileSync(cortexRulesPath, cortexRulesContent, 'utf-8');
+
+  // Inject root files for universal agent discovery (Cursor, Claude, Gemini)
+  fs.writeFileSync(path.join(ws, '.cursorrules'), cortexRulesContent, 'utf-8');
+  fs.writeFileSync(path.join(ws, 'CLAUDE.md'), cortexRulesContent, 'utf-8');
+  fs.writeFileSync(path.join(ws, 'GEMINI.md'), cortexRulesContent, 'utf-8');
+
+  console.log(`  + Injected Agent Governance rules: .agent/rules/ & root (.cursorrules, CLAUDE.md, GEMINI.md)`);
 
   // 9. Inject Google Gemini / Antigravity Hooks (.gemini/settings.json)
   const geminiDir = path.join(ws, '.gemini');

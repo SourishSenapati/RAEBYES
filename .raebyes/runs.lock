@@ -28,5 +28,15 @@
     "duration_ms": 2479,
     "proof_hmac": "a0c2320cf0dd2086dc85d10a474c3a20fb11edd206c8058ff8723b1e89b23697",
     "status": "VERIFIED"
+  },
+  {
+    "run_id": "RUN-0004",
+    "timestamp": "2026-10-23T11:32:34.578Z",
+    "command": "pnpm test",
+    "tree_hash": "bb5ad070d3ada01569cbfed3f196bfc9612d1f2935e06721aa780209cf8f0884",
+    "stdout_hash": "1b85c393e50fe80590ad9757dd70b4459f81286675fa1701815361c4795a486f",
+    "duration_ms": 2525,
+    "proof_hmac": "5a1504ee39ad93f41853c94470c7c1c51d93c87adfbb5b677e8ebf350b6e41a2",
+    "status": "VERIFIED"
   }
 ]

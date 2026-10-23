@@ -28,7 +28,7 @@ export async function runExec(commandArgs: string[], workspaceDir = process.cwd(
   const startTime = Date.now();
   let capturedStdout = '';
 
-  const child = child_process.spawn(cmd, args, {
+  const child = child_process.spawn(fullCmdStr, {
     stdio: ['inherit', 'pipe', 'inherit'],
     shell: true,
     cwd: ws

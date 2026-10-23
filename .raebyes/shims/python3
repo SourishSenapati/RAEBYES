@@ -1,0 +1,2 @@
+#!/bin/sh
+exec raebyesctl exec -- "python3" "$@"

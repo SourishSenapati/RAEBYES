@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-10-23T10:56:56.467Z",
+  "totalFiles": 47,
+  "hubs": [
+    {
+      "hubId": "HUB-0001",
+      "path": "daemons/raebyesd/src/engine/core-hub-graph.js",
+      "dependentCount": 4,
+      "dependents": [
+        "daemons/raebyesd/src/index.js",
+        "daemons/raebyesd/src/index.ts",
+        "daemons/raebyesd/src/ipc/socket-server.js",
+        "daemons/raebyesd/src/ipc/socket-server.ts"
+      ]
+    },
+    {
+      "hubId": "HUB-0002",
+      "path": "daemons/raebyesd/src/engine/hydrophobia.js",
+      "dependentCount": 4,
+      "dependents": [
+        "daemons/raebyesd/src/index.js",
+        "daemons/raebyesd/src/index.ts",
+        "daemons/raebyesd/src/ipc/socket-server.js",
+        "daemons/raebyesd/src/ipc/socket-server.ts"
+      ]
+    },
+    {
+      "hubId": "HUB-0003",
+      "path": "daemons/raebyesd/src/engine/spasm-breaker.js",
+      "dependentCount": 6,
+      "dependents": [
+        "daemons/raebyesd/src/engine/truth-enforcer.ts",
+        "daemons/raebyesd/src/engine/vault-healer.ts",
+        "daemons/raebyesd/src/index.js",
+        "daemons/raebyesd/src/index.ts",
+        "daemons/raebyesd/src/ipc/socket-server.js",
+        "daemons/raebyesd/src/ipc/socket-server.ts"
+      ]
+    },
+    {
+      "hubId": "HUB-0004",
+      "path": "daemons/raebyesd/src/engine/types.js",
+      "dependentCount": 3,
+      "dependents": [
+        "daemons/raebyesd/src/engine/core-hub-graph.ts",
+        "daemons/raebyesd/src/engine/variance-guard.ts",
+        "daemons/raebyesd/src/index.js"
+      ]
+    },
+    {
+      "hubId": "HUB-0005",
+      "path": "daemons/raebyesd/src/engine/variance-guard.js",
+      "dependentCount": 4,
+      "dependents": [
+        "daemons/raebyesd/src/index.js",
+        "daemons/raebyesd/src/index.ts",
+        "daemons/raebyesd/src/ipc/socket-server.js",
+        "daemons/raebyesd/src/ipc/socket-server.ts"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "run_id": "RUN-0001",
+    "timestamp": "2026-10-23T10:58:47.039Z",
+    "command": "pnpm test",
+    "tree_hash": "c21570be2ccef240492d18f618ec335fbd0bc9c1155b21e26d273e24259892de",
+    "stdout_hash": "7388a1e22767ed26fe9d9c7d4069428a22933ea61b04330dc1e19d76b9e54580",
+    "duration_ms": 1389,
+    "proof_hmac": "4db3fc7268b8675ef4412935269303861a5f749f33161c7b9639d093c5032989",
+    "status": "VERIFIED"
+  },
+  {
+    "run_id": "RUN-0002",
+    "timestamp": "2026-10-23T10:59:20.326Z",
+    "command": "pnpm test",
+    "tree_hash": "d79fa3ced48e5cac9cccfd5311f0c63dfc701322f6cd5d42c791b64e0b76e105",
+    "stdout_hash": "6acd563243693fcc612380fa0ff033326688a7954abd9d5252a6e9dcf6472c8e",
+    "duration_ms": 1383,
+    "proof_hmac": "527648ad5d155b806969864792edb486c4d18e475ed6efab4693c1b6ad1eb550",
+    "status": "VERIFIED"
+  }
+]

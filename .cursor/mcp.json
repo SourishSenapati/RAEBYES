@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "raebyes": {
+      "command": "raebyes-mcp",
+      "args": []
+    }
+  },
+  "hooks": {
+    "preExecution": "raebyesctl verify",
+    "stop": "raebyesctl verify-turn"
+  }
+}

@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { sendDaemonCommand, getDefaultSocketPath } from '@raebyes/daemon';
-import { AntibodyLedger } from 'raebyes';
+import { sendDaemonCommand, getDefaultSocketPath, AntibodyLedger } from '@raebyes/daemon';
 
 export async function runStatus(workspaceDir = process.cwd()) {
   const ws = path.resolve(workspaceDir);
@@ -32,11 +31,11 @@ export async function runStatus(workspaceDir = process.cwd()) {
     console.log(` Provider:   State: ${daemonData.providerState} | Uptime: ${daemonData.uptimeSec.toFixed(1)}s`);
     console.log(` Halted:     ${daemonData.isHalted ? 'YES (GLOBAL STOP TRIPPED)' : 'NO (Normal Operation)'}`);
     console.log(` Turn Cost:  $${daemonData.turnCostUsd.toFixed(3)} (Elapsed: ${daemonData.elapsedTurnSec.toFixed(1)}s)`);
-    if (daemonData.tools && daemonData.tools.length > 0) {
-      console.log(' Monitored Tools:');
-      for (const t of daemonData.tools) {
-        console.log(`   - ${t.toolName}: ${t.state} (Failures: ${t.failures}, Cooldown: ${t.inCooldown})`);
-      }
+    if (daemonData.currentTreeHash) {
+      console.log(` Tree Hash:  ${daemonData.currentTreeHash.slice(0, 16)}...`);
+    }
+    if (daemonData.latestRun) {
+      console.log(` Latest Run: ${daemonData.latestRun.run_id} (${daemonData.latestRun.status}) proof: ${daemonData.latestRun.proof_hmac.slice(0, 12)}...`);
     }
   }
 
@@ -48,8 +47,8 @@ export async function runStatus(workspaceDir = process.cwd()) {
   // Check Antibodies
   const antibodiesFile = path.join(raebyesDir, 'antibodies.json');
   if (fs.existsSync(antibodiesFile)) {
-    const ledger = new AntibodyLedger(antibodiesFile);
-    const v = ledger.verify();
+    const ledger = new AntibodyLedger(ws);
+    const v = ledger.verifyLedgerIntegrity();
     console.log(` Antibodies: ${v.totalEntries} rules (Ledger: ${v.valid ? 'VALID' : 'TAMPERED'})`);
   } else {
     console.log(` Antibodies: 0 rules (uninitialized)`);

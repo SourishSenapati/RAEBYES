@@ -1,6 +1,6 @@
 import * as child_process from 'child_process';
 import * as path from 'path';
-import { Raebyes } from 'raebyes';
+import { AntibodyLedger, TruthEnforcer, SpasmCircuitBreaker } from '@raebyes/daemon';
 
 export async function runExec(commandArgs: string[], workspaceDir = process.cwd()) {
   if (commandArgs.length === 0) {
@@ -9,53 +9,54 @@ export async function runExec(commandArgs: string[], workspaceDir = process.cwd(
   }
 
   const ws = path.resolve(workspaceDir);
-  const guard = new Raebyes({ workspaceDir: ws, mode: 'FATAL_SPASM' });
+  const ledger = new AntibodyLedger(ws);
+  const truthEnforcer = new TruthEnforcer(ws);
+  const breaker = new SpasmCircuitBreaker({ workspaceDir: ws });
 
   // 1. Verify ledger integrity
-  console.log('[RAEBYES PRE-FLIGHT] Verifying immutable antibody ledger integrity...');
-  guard.verifyLedger();
-
-  // 2. Replay historical regression assertions in milliseconds
-  console.log('[RAEBYES PRE-FLIGHT] Replaying historical regression assertions...');
-  const start = Date.now();
-  const replay = guard.replayAntibodies();
-  const elapsed = Date.now() - start;
-
-  if (!replay.passed) {
-    console.error('\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-    console.error(' [RAEBYES PRE-FLIGHT BREACH] HISTORICAL REGRESSION RESURFACED');
-    console.error(` Failed ${replay.failedAntibodies.length} antibody assertions (replayed in ${elapsed}ms):`);
-    for (const fail of replay.failedAntibodies) {
-      console.error(`   - [${fail.id}] ${fail.description}`);
-      console.error(`     Assertion: ${fail.rejection_assertion}`);
-    }
-    console.error('\n EXECUTION SEVERED BEFORE COMPUTE WASTED. EXIT CODE 137.');
-    console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n');
+  const verif = ledger.verifyLedgerIntegrity();
+  if (!verif.valid) {
+    console.error(`\n[RAEBYES EXEC HALT] Failure ledger tampered at ${verif.brokenAt}: ${verif.reason}`);
+    breaker.recordBreach('PRE_FLIGHT', `Ledger broken at ${verif.brokenAt}`, { verif });
     process.exit(137);
   }
 
-  console.log(`[RAEBYES PRE-FLIGHT] All ${replay.replayed} antibodies passed in ${elapsed}ms. Launching command...\n`);
-
-  // 3. Execute the actual command with direct stdio pass-through
   const cmd = commandArgs[0];
   const args = commandArgs.slice(1);
+  const fullCmdStr = commandArgs.join(' ');
+
+  const startTime = Date.now();
+  let capturedStdout = '';
 
   const child = child_process.spawn(cmd, args, {
-    stdio: 'inherit',
+    stdio: ['inherit', 'pipe', 'inherit'],
     shell: true,
     cwd: ws
   });
 
+  child.stdout.on('data', (chunk) => {
+    const text = chunk.toString();
+    capturedStdout += text;
+    process.stdout.write(chunk);
+  });
+
   child.on('exit', (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal);
+    const durationMs = Date.now() - startTime;
+
+    if (code === 0 && !signal) {
+      // Mint cryptographic proof-of-execution
+      const receipt = truthEnforcer.recordPassingRun(fullCmdStr, capturedStdout, durationMs);
+      console.log(`\nRAEBYES_PROOF[${receipt.run_id}:${receipt.proof_hmac}:VERIFIED]`);
+      console.log(`[RAEBYES] Cryptographic execution receipt minted in .raebyes/runs.lock (${durationMs}ms)\n`);
+      process.exit(0);
     } else {
-      process.exit(code || 0);
+      console.error(`\n[RAEBYES EXEC FAILED] Command exited with code ${code ?? signal}`);
+      process.exit(code || 1);
     }
   });
 
   child.on('error', (err) => {
-    console.error(`[RAEBYES EXEC ERROR] Failed to start process: ${err.message}`);
+    console.error(`[RAEBYES EXEC ERROR] Failed to start command: ${err.message}`);
     process.exit(1);
   });
 }

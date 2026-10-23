@@ -1,28 +1,28 @@
 import * as path from 'path';
-import { AntibodyLedger, AntibodyEntry } from 'raebyes';
+import { AntibodyLedger } from '@raebyes/daemon';
 
 export async function runImmunize(options: {
   description: string;
   type?: string;
   assertion: string;
+  component?: string;
   workspaceDir?: string;
 }) {
   const ws = path.resolve(options.workspaceDir || process.cwd());
-  const ledgerPath = path.join(ws, '.raebyes', 'antibodies.json');
-  const ledger = new AntibodyLedger(ledgerPath);
-
-  const assertionType = (options.type?.toUpperCase() || 'PREDICATE_JS') as AntibodyEntry['assertionType'];
+  const ledger = new AntibodyLedger(ws);
+  const component = options.component || 'core';
 
   console.log(`\n[RAEBYES IMMUNIZE] Recording new immutable failure antibody...`);
   console.log(`  Description: ${options.description}`);
-  console.log(`  Type:        ${assertionType}`);
-  console.log(`  Assertion:   ${options.assertion}`);
+  console.log(`  Component:   ${component}`);
+  console.log(`  Pattern:     ${options.assertion}`);
 
   try {
-    const entry = ledger.append({
-      description: options.description,
-      assertionType,
-      rejection_assertion: options.assertion
+    const entry = ledger.appendAntibody({
+      component,
+      false_claim: 'Agent hallucinated shortcut or deleted assertion',
+      underlying_flaw: options.description,
+      rejection_pattern: options.assertion
     });
 
     console.log(`\n[IMMUNIZATION SUCCESSFUL]`);

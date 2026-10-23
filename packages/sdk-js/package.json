@@ -20,6 +20,6 @@
   "author": "RAEBYES Governance Team",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
-    "@raebyes/daemon": "*"
+    "@raebyes/daemon": "workspace:*"
   }
 }

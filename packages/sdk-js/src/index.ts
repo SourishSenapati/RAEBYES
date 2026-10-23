@@ -1,9 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { AntibodyLedger, AntibodyEntry } from './ledger.js';
-import { HydrophobiaEngine } from '@raebyes/daemon';
-import { VarianceGuard } from '@raebyes/daemon';
-import { SpasmCircuitBreaker } from '@raebyes/daemon';
+import {
+  AntibodyLedger,
+  HydrophobiaEngine,
+  VarianceGuard,
+  SpasmCircuitBreaker,
+  TruthEnforcer,
+  AntibodyEntry
+} from '@raebyes/daemon';
 
 export * from './ledger.js';
 
@@ -31,9 +35,8 @@ export class RaebyesTamperError extends Error {
 }
 
 export interface RaebyesConfig {
-  ledgerPath?: string;
-  mode?: 'FATAL_SPASM' | 'THROW_ERROR' | 'LOG_ONLY';
   workspaceDir?: string;
+  mode?: 'FATAL_SPASM' | 'THROW_ERROR' | 'LOG_ONLY';
   socketPath?: string;
 }
 
@@ -49,6 +52,7 @@ export class Raebyes {
   public readonly mode: 'FATAL_SPASM' | 'THROW_ERROR' | 'LOG_ONLY';
   public readonly workspaceDir: string;
   public readonly ledger: AntibodyLedger;
+  public readonly truthEnforcer: TruthEnforcer;
   private hydrophobia: HydrophobiaEngine;
   private varianceGuard: VarianceGuard;
   private breaker: SpasmCircuitBreaker;
@@ -56,23 +60,19 @@ export class Raebyes {
   constructor(config: RaebyesConfig = {}) {
     this.mode = config.mode || 'FATAL_SPASM';
     this.workspaceDir = path.resolve(config.workspaceDir || process.cwd());
-    const ledgerFile = config.ledgerPath || path.join(this.workspaceDir, '.raebyes', 'antibodies.json');
-    this.ledger = new AntibodyLedger(ledgerFile);
+    this.ledger = new AntibodyLedger(this.workspaceDir);
+    this.truthEnforcer = new TruthEnforcer(this.workspaceDir);
     this.hydrophobia = new HydrophobiaEngine();
     this.varianceGuard = new VarianceGuard();
     this.breaker = new SpasmCircuitBreaker({ workspaceDir: this.workspaceDir });
 
-    // Validate ledger integrity on startup
-    if (fs.existsSync(ledgerFile)) {
+    if (fs.existsSync(this.ledger.getLedgerPath())) {
       this.verifyLedger();
     }
   }
 
-  /**
-   * Verify the immutable hash chain of the antibody ledger
-   */
   public verifyLedger(): boolean {
-    const result = this.ledger.verify();
+    const result = this.ledger.verifyLedgerIntegrity();
     if (!result.valid) {
       const msg = `[RAEBYES TAMPER DETECTION] Immutable ledger hash chain is broken at entry ${result.brokenAt}: ${result.reason}`;
       this.breaker.recordBreach('PRE_FLIGHT', msg, { brokenAt: result.brokenAt, reason: result.reason });
@@ -91,9 +91,6 @@ export class Raebyes {
     return true;
   }
 
-  /**
-   * Wraps an asynchronous or synchronous solver/function with deterministic runtime enforcement
-   */
   public enforced<TArgs extends unknown[], TReturn>(
     fn: (...args: TArgs) => Promise<TReturn> | TReturn,
     options: EnforcementInvariants<TReturn> = {}
@@ -101,7 +98,6 @@ export class Raebyes {
     const id = options.id || 'INVARIANT-BLOCK';
 
     return async (...args: TArgs): Promise<TReturn> => {
-      // 1. Verify ledger hasn't been modified in-flight
       this.verifyLedger();
 
       const startTime = Date.now();
@@ -110,8 +106,7 @@ export class Raebyes {
       try {
         result = await fn(...args);
       } catch (err) {
-        // If underlying function failed, record failure and rethrow
-        this.breaker.recordBreach('CIRCUIT_BREAKER', `Wrapped task ${id} crashed with unhandled exception`, {
+        this.breaker.recordBreach('CIRCUIT_BREAKER', `Wrapped task ${id} crashed with exception`, {
           error: err instanceof Error ? err.message : String(err)
         });
         throw err;
@@ -120,14 +115,12 @@ export class Raebyes {
       const executionTimeMs = Date.now() - startTime;
       const violations: string[] = [];
 
-      // 2. Check Execution Time
       if (options.minExecutionTimeMs && executionTimeMs < options.minExecutionTimeMs) {
         violations.push(
-          `Execution completed in ${executionTimeMs}ms, but expected minimum solver time is ${options.minExecutionTimeMs}ms (synthetic shortcut / trivial mock detected)`
+          `Execution completed in ${executionTimeMs}ms (minimum required: ${options.minExecutionTimeMs}ms). Fake instant solver detected.`
         );
       }
 
-      // 3. Numerical Variance Check
       if (options.minVariance !== undefined || options.disallowZeros) {
         const vCheck = this.varianceGuard.verify(result, executionTimeMs, {
           minVariance: options.minVariance,
@@ -138,7 +131,6 @@ export class Raebyes {
         }
       }
 
-      // 4. Custom Invariants
       if (options.invariants && options.invariants.length > 0) {
         const invCheck = this.varianceGuard.evaluateInvariants(result, options.invariants);
         if (!invCheck.passed) {
@@ -146,7 +138,6 @@ export class Raebyes {
         }
       }
 
-      // 5. Handle Violations
       if (violations.length > 0) {
         const record = this.breaker.recordBreach('VARIANCE', `Violations during execution of ${id}`, {
           task: id,
@@ -174,39 +165,29 @@ export class Raebyes {
     };
   }
 
-  /**
-   * Scans a code buffer for synthetic shortcuts, static constants, or deleted assertions
-   */
   public checkCode(code: string, filename = 'script.ts', originalCode?: string) {
-    return this.hydrophobia.scanCode(code, filename, originalCode);
+    const antibodies = this.ledger.readEntries();
+    return this.hydrophobia.scanCode(code, filename, originalCode, antibodies);
   }
 
-  /**
-   * Scans a git diff for deleted assertions
-   */
   public checkDiff(diffText: string) {
-    return this.hydrophobia.scanDiff(diffText);
+    const antibodies = this.ledger.readEntries();
+    return this.hydrophobia.scanDiff(diffText, antibodies);
   }
 
-  /**
-   * Replays historical antibodies against current workspace
-   */
   public replayAntibodies(): { passed: boolean; replayed: number; failedAntibodies: AntibodyEntry[] } {
     const entries = this.ledger.readEntries();
     const failedAntibodies: AntibodyEntry[] = [];
 
     for (const entry of entries) {
-      if (entry.assertionType === 'PREDICATE_JS') {
-        try {
-          // Evaluate deterministic JS predicate in isolated context
-          const predicate = new Function('workspaceDir', `return (function() { ${entry.rejection_assertion} })(workspaceDir);`);
-          const passed = Boolean(predicate(this.workspaceDir));
-          if (!passed) {
-            failedAntibodies.push(entry);
-          }
-        } catch {
+      try {
+        const predicate = new Function('workspaceDir', `return (function() { ${entry.rejection_pattern} })(workspaceDir);`);
+        const passed = Boolean(predicate(this.workspaceDir));
+        if (!passed) {
           failedAntibodies.push(entry);
         }
+      } catch {
+        failedAntibodies.push(entry);
       }
     }
 

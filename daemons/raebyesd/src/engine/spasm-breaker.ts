@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { BreakerState, BreachRecord, ToolCallLog } from './types.js';
+import { CircuitState, BreachRecord, ToolCallLog } from '../types.js';
 
 export interface SpasmConfig {
   workspaceDir: string;
@@ -17,23 +17,20 @@ export interface SpasmConfig {
 }
 
 export class SpasmCircuitBreaker {
-  // Provider breaker state
-  private providerState: BreakerState = 'CLOSED';
+  private providerState: CircuitState = 'CLOSED';
   private providerFailures: number[] = [];
   private providerOpenedAt = 0;
 
-  // Tool breaker state: toolName -> { state, failures, openedAt, cooldownUntil }
   private toolStates: Map<
     string,
     {
-      state: BreakerState;
+      state: CircuitState;
       failures: number[];
       openedAt: number;
       cooldownUntil: number;
     }
   > = new Map();
 
-  // Loop & resource governor
   private consecutiveGlobalFailures = 0;
   private callHistory: ToolCallLog[] = [];
   private goalAttempts: Map<string, number[]> = new Map();
@@ -60,13 +57,12 @@ export class SpasmCircuitBreaker {
     this.initBreachCounter();
   }
 
-  // --- 1. PROVIDER CIRCUIT BREAKER ---
   public isProviderHealthy(): boolean {
     const now = Date.now();
     if (this.providerState === 'OPEN') {
       if (now - this.providerOpenedAt > this.config.probeTimeoutSec * 1000) {
         this.providerState = 'HALF_OPEN';
-        return true; // Allow 1 probe request
+        return true;
       }
       return false;
     }
@@ -92,12 +88,11 @@ export class SpasmCircuitBreaker {
     }
   }
 
-  public getProviderState(): BreakerState {
-    this.isProviderHealthy(); // Refresh HALF_OPEN if probe timeout expired
+  public getProviderState(): CircuitState {
+    this.isProviderHealthy();
     return this.providerState;
   }
 
-  // --- 2. TOOL CIRCUIT BREAKER ---
   public isToolAllowed(toolName: string): { allowed: boolean; reason?: string } {
     if (this.isHalted) {
       return { allowed: false, reason: 'GLOBAL HALT: Global agent failure threshold exceeded. Paused for human review.' };
@@ -116,7 +111,7 @@ export class SpasmCircuitBreaker {
     }
 
     if (tool.state === 'OPEN') {
-      if (now - tool.openedAt > 300 * 1000) { // 5-minute auto-reset
+      if (now - tool.openedAt > 300 * 1000) {
         tool.state = 'HALF_OPEN';
         return { allowed: true };
       }
@@ -167,14 +162,14 @@ export class SpasmCircuitBreaker {
     }
   }
 
-  // --- 3. SEMANTIC LOOP & RESOURCE GOVERNOR ---
   public verifyToolInvocation(
     toolName: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    currentTreeHash?: string
   ): { allowed: boolean; violation?: string } {
     const now = Date.now();
 
-    // Check Wall Clock Timeout
+    // Wall Clock Timeout
     const elapsedSec = (now - this.turnStartTimestamp) / 1000;
     if (elapsedSec > this.config.wallClockTimeoutSec) {
       const msg = `Wall-clock timeout breached (${elapsedSec.toFixed(1)}s > ${this.config.wallClockTimeoutSec}s)`;
@@ -182,78 +177,60 @@ export class SpasmCircuitBreaker {
       return { allowed: false, violation: msg };
     }
 
-    // Check Turn Budget
+    // Turn Budget
     if (this.turnCostUsd > this.config.maxTurnBudgetUsd) {
       const msg = `Turn budget ceiling exceeded ($${this.turnCostUsd.toFixed(2)} > $${this.config.maxTurnBudgetUsd.toFixed(2)})`;
       this.recordBreach('CIRCUIT_BREAKER', msg, { turnCostUsd: this.turnCostUsd });
       return { allowed: false, violation: msg };
     }
 
-    // Compute cryptographic argument hash
+    // Hash toolName + canonicalized arguments
     const hash = crypto
       .createHash('sha256')
-      .update(toolName + JSON.stringify(args, Object.keys(args).sort()))
+      .update(toolName + JSON.stringify(args, Object.keys(args || {}).sort()))
       .digest('hex');
 
-    // 1. Identical consecutive calls
+    // 1. Check for 3x identical consecutive calls (ERR_IDENTICAL_LOOP)
     const recentIdentical = this.callHistory.slice(-this.config.identicalCallHashLimit + 1);
     if (
       recentIdentical.length === this.config.identicalCallHashLimit - 1 &&
       recentIdentical.every(entry => entry.argsHash === hash)
     ) {
-      const msg = `Agent intercepted in repetitive call loop: ${this.config.identicalCallHashLimit} identical invocations of '${toolName}'`;
+      const msg = `ERR_IDENTICAL_LOOP: ${this.config.identicalCallHashLimit} identical invocations of '${toolName}' detected`;
       this.recordBreach('CIRCUIT_BREAKER', msg, { toolName, argsHash: hash });
+      this.providerState = 'OPEN';
+      this.providerOpenedAt = now;
       return { allowed: false, violation: msg };
     }
 
-    // 2. Cyclic tool invocation pattern check (e.g., A -> B -> A -> B without state change)
-    if (this.callHistory.length >= 4) {
+    // 2. Cyclic tool call pattern check (A -> B -> A -> B) without tree hash progression (ERR_CYCLIC_CONVERGENCE)
+    if (this.callHistory.length >= 3) {
       const h = this.callHistory.map(c => c.toolName);
       const l = h.length;
       if (
         h[l - 1] === h[l - 3] &&
-        h[l - 2] === h[l - 4] &&
-        h[l - 1] === toolName
+        h[l - 2] === toolName
       ) {
-        const msg = `Agent trapped in 2x cyclic tool sequence [${h[l - 2]} -> ${toolName}] without state change`;
-        this.recordBreach('CIRCUIT_BREAKER', msg, { sequence: [h[l - 2], toolName] });
-        return { allowed: false, violation: msg };
+        // If git tree hash hasn't changed between cycles
+        const lastTree = this.callHistory[l - 3].treeHash;
+        if (!lastTree || lastTree === currentTreeHash) {
+          const msg = `ERR_CYCLIC_CONVERGENCE: 2x cyclic tool pattern [${h[l - 1]} -> ${toolName}] without workspace progression`;
+          this.recordBreach('CIRCUIT_BREAKER', msg, { sequence: [h[l - 1], toolName] });
+          this.providerState = 'OPEN';
+          this.providerOpenedAt = now;
+          return { allowed: false, violation: msg };
+        }
       }
     }
 
     this.callHistory.push({
       toolName,
       argsHash: hash,
-      timestamp: now
+      timestamp: now,
+      treeHash: currentTreeHash
     });
 
     return { allowed: true };
-  }
-
-  public recordSemanticGoalAttempt(goal: string): { allowed: boolean; violation?: string } {
-    const now = Date.now();
-    const windowMs = 5 * 60 * 1000;
-    const history = (this.goalAttempts.get(goal) || []).filter(t => now - t <= windowMs);
-    history.push(now);
-    this.goalAttempts.set(goal, history);
-
-    if (history.length >= 3) {
-      const msg = `Semantic goal retry limit reached (3+ failed attempts in 5 minutes for '${goal}')`;
-      this.recordBreach('CIRCUIT_BREAKER', msg, { goal, attempts: history.length });
-      return { allowed: false, violation: msg };
-    }
-
-    return { allowed: true };
-  }
-
-  public addCost(usd: number): void {
-    this.turnCostUsd += usd;
-  }
-
-  public resetTurn(): void {
-    this.turnStartTimestamp = Date.now();
-    this.turnCostUsd = 0;
-    this.callHistory = [];
   }
 
   public tripAll(reason = 'Manual Quarantine Override'): void {
@@ -274,7 +251,8 @@ export class SpasmCircuitBreaker {
     this.consecutiveGlobalFailures = 0;
     this.toolStates.clear();
     this.callHistory = [];
-    this.resetTurn();
+    this.turnStartTimestamp = Date.now();
+    this.turnCostUsd = 0;
   }
 
   public getStatus() {
@@ -293,7 +271,6 @@ export class SpasmCircuitBreaker {
     };
   }
 
-  // --- 4. BREACH TRAJECTORY RECORDER ---
   public recordBreach(
     layer: BreachRecord['layer'],
     reason: string,
@@ -317,7 +294,7 @@ export class SpasmCircuitBreaker {
       const breachFile = path.join(trajDir, `${breachId}.json`);
       fs.writeFileSync(breachFile, JSON.stringify(record, null, 2), 'utf-8');
     } catch {
-      // Ignore write errors during fatal shutdown
+      // Ignore write errors
     }
 
     return record;

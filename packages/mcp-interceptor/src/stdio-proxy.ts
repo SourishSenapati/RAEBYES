@@ -1,12 +1,18 @@
 import * as path from 'path';
-import { FreshnessLock } from './freshness-lock.js';
+import * as child_process from 'child_process';
 import { ErrorInjector } from './error-injector.js';
-import { HydrophobiaEngine, VarianceGuard, CoreHubGraph, SpasmCircuitBreaker } from '@raebyes/daemon';
-import { AntibodyLedger } from 'raebyes';
+import {
+  HydrophobiaEngine,
+  VarianceGuard,
+  CoreHubGraph,
+  SpasmCircuitBreaker,
+  AntibodyLedger,
+  TruthEnforcer
+} from '@raebyes/daemon';
 
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
-  id?: string | number;
+  id?: string | number | null;
   method: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   params?: any;
@@ -14,7 +20,7 @@ export interface JsonRpcRequest {
 
 export interface JsonRpcResponse {
   jsonrpc: '2.0';
-  id?: string | number;
+  id?: string | number | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result?: any;
   error?: {
@@ -27,27 +33,46 @@ export interface JsonRpcResponse {
 
 export class McpStdioProxy {
   private workspaceDir: string;
-  private freshness: FreshnessLock;
   private hydrophobia: HydrophobiaEngine;
   private varianceGuard: VarianceGuard;
   private coreHubGraph: CoreHubGraph;
   private breaker: SpasmCircuitBreaker;
   private ledger: AntibodyLedger;
+  private truthEnforcer: TruthEnforcer;
+  private childMcpProcess: child_process.ChildProcess | null = null;
 
-  constructor(workspaceDir = process.cwd()) {
+  constructor(workspaceDir = process.cwd(), childCommand?: string[]) {
     this.workspaceDir = path.resolve(workspaceDir);
-    this.freshness = new FreshnessLock();
     this.hydrophobia = new HydrophobiaEngine();
     this.varianceGuard = new VarianceGuard();
     this.coreHubGraph = new CoreHubGraph(this.workspaceDir);
     this.breaker = new SpasmCircuitBreaker({ workspaceDir: this.workspaceDir });
-    this.ledger = new AntibodyLedger(path.join(this.workspaceDir, '.raebyes', 'antibodies.json'));
+    this.ledger = new AntibodyLedger(this.workspaceDir);
+    this.truthEnforcer = new TruthEnforcer(this.workspaceDir);
 
     const lockPath = path.join(this.workspaceDir, '.raebyes', 'graph.lock');
     this.coreHubGraph.loadLockfile(lockPath);
+
+    if (childCommand && childCommand.length > 0) {
+      this.spawnChildMcp(childCommand);
+    }
   }
 
-  public getToolDefinitions() {
+  private spawnChildMcp(commandArgs: string[]): void {
+    const cmd = commandArgs[0];
+    const args = commandArgs.slice(1);
+    this.childMcpProcess = child_process.spawn(cmd, args, {
+      stdio: ['pipe', 'pipe', 'inherit'],
+      shell: true,
+      cwd: this.workspaceDir
+    });
+
+    this.childMcpProcess.on('error', (err) => {
+      console.error(`[RAEBYES MCP] Child MCP process error: ${err.message}`);
+    });
+  }
+
+  public getNativeToolDefinitions() {
     return [
       {
         name: 'raebyes_preflight_check',
@@ -106,23 +131,18 @@ export class McpStdioProxy {
           type: 'object',
           properties: {
             description: { type: 'string', description: 'Human-readable description of failure pattern' },
-            assertion: { type: 'string', description: 'Executable JavaScript rejection assertion' },
-            assertionType: { type: 'string', enum: ['PREDICATE_JS', 'AST_RULE', 'SHELL_EXIT', 'VARIANCE_RULE'], default: 'PREDICATE_JS' }
+            pattern: { type: 'string', description: 'Regex or JS rejection pattern' },
+            component: { type: 'string', default: 'core' }
           },
-          required: ['description', 'assertion']
+          required: ['description', 'pattern']
         }
       },
       {
-        name: 'raebyes_record_decision',
-        description: 'Commit an immutable architectural decision constraint (DEC-XXXX) that future agents are forbidden from altering.',
+        name: 'raebyes_verify_turn',
+        description: 'Verify that current workspace state matches a passing RUN-XXXX execution receipt before concluding turn.',
         inputSchema: {
           type: 'object',
-          properties: {
-            title: { type: 'string', description: 'Decision title' },
-            constraint: { type: 'string', description: 'Strict constraint or rule' },
-            context: { type: 'string', description: 'Engineering context and rationale' }
-          },
-          required: ['title', 'constraint']
+          properties: {}
         }
       },
       {
@@ -138,41 +158,79 @@ export class McpStdioProxy {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public async handleToolCall(name: string, args: any) {
+    const currentTreeHash = this.truthEnforcer.computeWorkingTreeHash();
+
     // 1. Check Circuit Breaker loop and tool permission
-    const breakerCheck = this.breaker.verifyToolInvocation(name, args || {});
+    const breakerCheck = this.breaker.verifyToolInvocation(name, args || {}, currentTreeHash);
     if (!breakerCheck.allowed) {
       const breach = this.breaker.recordBreach('CIRCUIT_BREAKER', breakerCheck.violation || 'Loop tripped', { name, args });
-      return ErrorInjector.createSpasmError('CIRCUIT_BREAKER', breakerCheck.violation || 'Circuit breaker tripped', [], breach.id);
+      return this.formatSpasmBreach(breach.id, breakerCheck.violation || 'Circuit breaker tripped');
     }
 
+    // 2. Intercept Known Read Tools to track freshness
+    if (['read_file', 'get_script', 'view_file', 'read_resource'].includes(name)) {
+      const target = args?.filePath || args?.path || args?.AbsolutePath || args?.TargetFile;
+      if (typeof target === 'string') {
+        this.hydrophobia.recordRead(target);
+      }
+    }
+
+    // 3. Intercept Known Mutating Tools
+    if (['write_to_file', 'replace_file_content', 'multi_replace_file_content', 'patch', 'edit_file'].includes(name)) {
+      const target = args?.TargetFile || args?.filePath || args?.path;
+      if (typeof target === 'string') {
+        // Freshness check
+        const fresh = this.hydrophobia.checkFreshness(target, this.workspaceDir);
+        if (!fresh.allowed) {
+          const breach = this.breaker.recordBreach('PRE_FLIGHT', fresh.violation?.message || 'ERR_BLIND_EDIT', { target, args });
+          return this.formatSpasmBreach(breach.id, fresh.violation?.message || 'ERR_BLIND_EDIT');
+        }
+
+        // Core Hub lock check
+        const hubRisk = this.coreHubGraph.assessMutationRisk(target, 'PATCH');
+        if (!hubRisk.allowed) {
+          const breach = this.breaker.recordBreach('HUB_LOCK', hubRisk.reason || 'Core Hub lock block', { target, hubId: hubRisk.hubId });
+          return this.formatSpasmBreach(breach.id, hubRisk.reason || 'Core Hub locked against mutation');
+        }
+
+        // Code / Diff shortcut scan
+        const code = args?.CodeContent || args?.ReplacementContent || args?.content;
+        if (typeof code === 'string') {
+          const antibodies = this.ledger.readEntries();
+          const scan = this.hydrophobia.scanCode(code, target, undefined, antibodies);
+          if (!scan.passed) {
+            const first = scan.violations[0];
+            const breach = this.breaker.recordBreach('HYDROPHOBIA', first.message, { violations: scan.violations });
+            return this.formatSpasmBreach(breach.id, first.message);
+          }
+        }
+      }
+    }
+
+    // 4. Handle Native Governance Tools
     switch (name) {
       case 'raebyes_record_read': {
-        this.freshness.recordRead(args.filePath);
+        this.hydrophobia.recordRead(args.filePath);
         return ErrorInjector.createSuccessResponse({
           recorded: true,
           filePath: args.filePath,
           timestamp: Date.now(),
-          status: 'Freshness registered. File is eligible for patching within 120 seconds.'
+          status: 'Freshness registered. File is eligible for modification within 120 seconds.'
         });
       }
 
       case 'raebyes_preflight_check': {
         const { filePath, action } = args;
-
-        // Freshness check
-        if (action === 'PATCH') {
-          const fresh = this.freshness.assessPatchRisk(filePath);
-          if (!fresh.allowed) {
-            const breach = this.breaker.recordBreach('PRE_FLIGHT', fresh.message || 'Stale read', { filePath, action });
-            return ErrorInjector.createSpasmError('PRE_FLIGHT', fresh.message || 'Stale read', [], breach.id);
-          }
+        const fresh = this.hydrophobia.checkFreshness(filePath, this.workspaceDir);
+        if (!fresh.allowed) {
+          const breach = this.breaker.recordBreach('PRE_FLIGHT', fresh.violation?.message || 'ERR_BLIND_EDIT', { filePath, action });
+          return this.formatSpasmBreach(breach.id, fresh.violation?.message || 'ERR_BLIND_EDIT');
         }
 
-        // Dependency hub check
         const hubRisk = this.coreHubGraph.assessMutationRisk(filePath, action);
         if (!hubRisk.allowed) {
-          const breach = this.breaker.recordBreach('HUB_LOCK', hubRisk.reason || 'Core Hub block', { filePath, action, hubId: hubRisk.hubId });
-          return ErrorInjector.createSpasmError('CORE_HUB', hubRisk.reason || 'Core Hub deletion block', [], breach.id);
+          const breach = this.breaker.recordBreach('HUB_LOCK', hubRisk.reason || 'Core Hub block', { filePath, action });
+          return this.formatSpasmBreach(breach.id, hubRisk.reason || 'Core Hub block');
         }
 
         return ErrorInjector.createSuccessResponse({
@@ -188,40 +246,31 @@ export class McpStdioProxy {
 
       case 'raebyes_scan_diff': {
         const { diffText, code, filename, originalCode } = args;
+        const antibodies = this.ledger.readEntries();
 
         if (diffText) {
-          const diffReport = this.hydrophobia.scanDiff(diffText);
+          const diffReport = this.hydrophobia.scanDiff(diffText, antibodies);
           if (!diffReport.passed) {
-            const breach = this.breaker.recordBreach('HYDROPHOBIA', 'Detected shortcut / deleted assertions in diff', {
+            const breach = this.breaker.recordBreach('HYDROPHOBIA', 'Diff contains shortcut patterns', {
               violations: diffReport.violations
             });
-            return ErrorInjector.createSpasmError(
-              'HYDROPHOBIA',
-              'Diff contains prohibited shortcut patterns or deleted test assertions',
-              diffReport.violations.map(v => `[${v.type}] ${v.message}`),
-              breach.id
-            );
+            return this.formatSpasmBreach(breach.id, diffReport.violations[0].message);
           }
         }
 
         if (code) {
-          const codeReport = this.hydrophobia.scanCode(code, filename || 'script.ts', originalCode);
+          const codeReport = this.hydrophobia.scanCode(code, filename || 'script.ts', originalCode, antibodies);
           if (!codeReport.passed) {
-            const breach = this.breaker.recordBreach('HYDROPHOBIA', 'Detected shortcut / static returns in code', {
+            const breach = this.breaker.recordBreach('HYDROPHOBIA', 'Code contains shortcuts or static returns', {
               violations: codeReport.violations
             });
-            return ErrorInjector.createSpasmError(
-              'HYDROPHOBIA',
-              'Code contains prohibited shortcuts or static constant stubs',
-              codeReport.violations.map(v => `[${v.type}] ${v.message}`),
-              breach.id
-            );
+            return this.formatSpasmBreach(breach.id, codeReport.violations[0].message);
           }
         }
 
         return ErrorInjector.createSuccessResponse({
           passed: true,
-          status: 'Hydrophobia AST scan clean. No shortcuts or deleted assertions detected.'
+          status: 'Hydrophobia AST scan clean. Zero shortcuts or deleted assertions detected.'
         });
       }
 
@@ -233,15 +282,10 @@ export class McpStdioProxy {
         });
 
         if (!vResult.passed) {
-          const breach = this.breaker.recordBreach('VARIANCE', 'Solver output failed variance/runtime invariants', {
+          const breach = this.breaker.recordBreach('VARIANCE', 'Solver output failed variance invariants', {
             violations: vResult.violations
           });
-          return ErrorInjector.createSpasmError(
-            'VARIANCE',
-            'Numerical output flagged as synthetic or flat approximation',
-            vResult.violations,
-            breach.id
-          );
+          return this.formatSpasmBreach(breach.id, vResult.violations[0]);
         }
 
         return ErrorInjector.createSuccessResponse({
@@ -250,16 +294,17 @@ export class McpStdioProxy {
           mean: vResult.mean,
           stdDev: vResult.stdDev,
           executionTimeMs: vResult.executionTimeMs,
-          status: 'Variance and execution runtime verified.'
+          status: 'Variance verified.'
         });
       }
 
       case 'raebyes_record_failure': {
-        const { description, assertion, assertionType } = args;
-        const entry = this.ledger.append({
-          description,
-          assertionType: assertionType || 'PREDICATE_JS',
-          rejection_assertion: assertion
+        const { description, pattern, component } = args;
+        const entry = this.ledger.appendAntibody({
+          component: component || 'core',
+          false_claim: 'Agent hallucinated shortcut or bypassed test assertion',
+          underlying_flaw: description,
+          rejection_pattern: pattern
         });
         return ErrorInjector.createSuccessResponse({
           recorded: true,
@@ -268,33 +313,25 @@ export class McpStdioProxy {
         });
       }
 
-      case 'raebyes_record_decision': {
-        const { title, constraint, context } = args;
-        // Dynamically import decision command logic
-        const { runDecision } = await import('../../raebyesctl/dist/commands/decision.js').catch(() => {
-          return {
-            runDecision: async (t: string, c: string, cx?: string) => {
-              // Fallback inline decision append
-              const f = path.join(this.workspaceDir, '.raebyes', 'decisions.json');
-              const arr = [];
-              arr.push({ id: `DEC-${Date.now()}`, title: t, constraint: c, context: cx });
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
-              (await import('fs')).writeFileSync(f, JSON.stringify(arr, null, 2));
-            }
-          };
-        });
-        await runDecision(title, constraint, context, this.workspaceDir);
+      case 'raebyes_verify_turn': {
+        const check = this.truthEnforcer.verifyTurn(this.breaker);
+        if (!check.allowed) {
+          const breach = this.breaker.recordBreach('LIE_DETECTOR', check.reason || 'Unverified mutations', { check });
+          return this.formatSpasmBreach(breach.id, check.reason || 'Unverified mutations detected.');
+        }
         return ErrorInjector.createSuccessResponse({
-          recorded: true,
-          title,
-          constraint,
-          status: 'Architectural constraint committed to .raebyes/decisions.json'
+          allowed: true,
+          treeHash: check.currentTreeHash,
+          latestRunId: check.latestRunId,
+          status: 'Turn verified: current working tree hash matches verified run receipt.'
         });
       }
 
       case 'raebyes_status': {
         const breakerStatus = this.breaker.getStatus();
-        const v = this.ledger.verify();
+        const v = this.ledger.verifyLedgerIntegrity();
+        const treeHash = this.truthEnforcer.computeWorkingTreeHash();
+        const latestRun = this.ledger.getLatestVerifiedReceipt();
         return ErrorInjector.createSuccessResponse({
           breaker: breakerStatus,
           antibodies: {
@@ -302,13 +339,58 @@ export class McpStdioProxy {
             valid: v.valid,
             brokenAt: v.brokenAt
           },
+          currentTreeHash: treeHash,
+          latestRun,
           workspaceDir: this.workspaceDir
         });
       }
 
       default:
+        // Forward to child MCP if available
+        if (this.childMcpProcess) {
+          return this.forwardToChildMcp('tools/call', { name, arguments: args });
+        }
         return ErrorInjector.createSpasmError('CIRCUIT_BREAKER', `Unknown tool: ${name}`);
     }
+  }
+
+  private formatSpasmBreach(breachId: string, reason: string) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text' as const,
+          text: `[RAEBYES_SPASM_BREACH: ${breachId}] Deterministic Circuit Breaker blocked shortcut/violation (${reason}). File write refused. You must implement the authentic solution without mocks, shortcuts, or blind edits.`
+        }
+      ]
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private forwardToChildMcp(method: string, params: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.childMcpProcess || !this.childMcpProcess.stdin) {
+        return reject(new Error('Child MCP process is not running'));
+      }
+      const reqId = `FWD-${Date.now()}`;
+      const msg: JsonRpcRequest = { jsonrpc: '2.0', id: reqId, method, params };
+
+      const onData = (chunk: Buffer) => {
+        const str = chunk.toString();
+        try {
+          const res: JsonRpcResponse = JSON.parse(str);
+          if (res.id === reqId) {
+            this.childMcpProcess?.stdout?.removeListener('data', onData);
+            resolve(res.result);
+          }
+        } catch {
+          // Streaming json
+        }
+      };
+
+      this.childMcpProcess.stdout?.on('data', onData);
+      this.childMcpProcess.stdin.write(JSON.stringify(msg) + '\n');
+    });
   }
 
   public async processRequest(req: JsonRpcRequest): Promise<JsonRpcResponse> {
@@ -336,7 +418,7 @@ export class McpStdioProxy {
           jsonrpc: '2.0',
           id,
           result: {
-            tools: this.getToolDefinitions()
+            tools: this.getNativeToolDefinitions()
           }
         };
 

@@ -1,12 +1,14 @@
 import * as readline from 'readline';
+import * as url from 'url';
+import * as path from 'path';
 import { McpStdioProxy, JsonRpcRequest } from './stdio-proxy.js';
 
 export * from './freshness-lock.js';
 export * from './error-injector.js';
 export * from './stdio-proxy.js';
 
-export function startMcpServer(workspaceDir = process.cwd()) {
-  const proxy = new McpStdioProxy(workspaceDir);
+export function startMcpServer(workspaceDir = process.cwd(), childCommand?: string[]) {
+  const proxy = new McpStdioProxy(workspaceDir, childCommand);
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -35,9 +37,6 @@ export function startMcpServer(workspaceDir = process.cwd()) {
   process.stderr.write('[RAEBYES MCP] Deterministic MCP Interceptor active on stdio\n');
 }
 
-import * as url from 'url';
-import * as path from 'path';
-
 const isMain = Boolean(
   process.argv[1] &&
   (path.resolve(process.argv[1]) === path.resolve(url.fileURLToPath(import.meta.url)) ||
@@ -46,5 +45,8 @@ const isMain = Boolean(
 );
 
 if (isMain) {
-  startMcpServer();
+  const args = process.argv.slice(2);
+  const separatorIdx = args.indexOf('--');
+  const childCmd = separatorIdx !== -1 ? args.slice(separatorIdx + 1) : undefined;
+  startMcpServer(process.cwd(), childCmd);
 }

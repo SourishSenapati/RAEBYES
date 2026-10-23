@@ -1,25 +1,83 @@
 import * as parser from '@babel/parser';
 import traversePkg from '@babel/traverse';
-import { HydrophobiaReport, HydrophobiaViolation } from './types.js';
+import * as fs from 'fs';
+import * as path from 'path';
+import { HydrophobiaReport, HydrophobiaViolation, AntibodyEntry } from '../types.js';
 
 // Handle ESM / CJS interop for babel traverse
 const traverse = (traversePkg as unknown as { default?: typeof traversePkg }).default || traversePkg;
 
 export class HydrophobiaEngine {
+  private scriptReadTimes: Map<string, number> = new Map();
+  private freshnessThresholdMs = 120_000; // 120 seconds
+
   private shortcutKeywords = [
-    /\bTODO:\s*(implement|replace with real|solver placeholder|shortcut|mock)/i,
-    /\bFIXME:\s*(bypass|stub|fake)/i,
-    /\bmock(Implementation|ReturnValue|ResolvedValue)\s*\(\s*(\(\)\s*=>\s*)?(true|false|42|null|\{\}|\[\])\s*\)/i,
+    /\bTODO:\s*(implement|replace with real|solver placeholder|shortcut|mock|stub)/i,
+    /\bFIXME:\s*(bypass|stub|fake|workaround)/i,
+    /\bmock(Implementation|ReturnValue|ResolvedValue|Return)\s*\(\s*(\(\)\s*=>\s*)?(true|false|42|null|\{\}|\[\])\s*\)/i,
     /\blinear\s+approximation\s+placeholder\b/i,
     /\b(dummy_solver|fake_solver|mock_solver|synthetic_data_bypass)\b/i,
     /\btest\.skip\b|\bxit\b|\bxdescribe\b/i,
     /\bpytest\.mark\.skip\b/i
   ];
 
+  public recordRead(filePath: string): void {
+    const normalized = path.normalize(filePath).replace(/\\/g, '/');
+    this.scriptReadTimes.set(normalized, Date.now());
+  }
+
   /**
-   * Scans a single source file (JS, TS, or text) for synthetic shortcuts and mock returns
+   * Freshness Lock: Validates that a file was read in the current session before permitting a patch
    */
-  public scanCode(code: string, filename: string, originalCode?: string): HydrophobiaReport {
+  public checkFreshness(filePath: string, workspaceDir?: string): { allowed: boolean; violation?: HydrophobiaViolation } {
+    const ws = workspaceDir ? path.resolve(workspaceDir) : process.cwd();
+    const full = path.isAbsolute(filePath) ? filePath : path.join(ws, filePath);
+
+    // If file doesn't exist on disk yet, it's a new file creation, permitted without prior read
+    if (!fs.existsSync(full)) {
+      return { allowed: true };
+    }
+
+    const normalized = path.normalize(filePath).replace(/\\/g, '/');
+    const lastRead = this.scriptReadTimes.get(normalized);
+
+    if (!lastRead) {
+      return {
+        allowed: false,
+        violation: {
+          file: normalized,
+          type: 'ERR_BLIND_EDIT',
+          message: `BLIND EDIT REJECTED: Script '${normalized}' has not been read in this session. Blind patching is strictly forbidden. You must read the file before modifying it.`,
+          severity: 'FATAL'
+        }
+      };
+    }
+
+    const elapsed = Date.now() - lastRead;
+    if (elapsed > this.freshnessThresholdMs) {
+      return {
+        allowed: false,
+        violation: {
+          file: normalized,
+          type: 'ERR_BLIND_EDIT',
+          message: `STALE READ REJECTED: Script '${normalized}' was read ${(elapsed / 1000).toFixed(0)}s ago (exceeds 120s freshness window). Re-read file before patching.`,
+          severity: 'CRITICAL'
+        }
+      };
+    }
+
+    return { allowed: true };
+  }
+
+  /**
+   * Scans a single source file for synthetic shortcuts, static returns, and antibody violations
+   */
+  public scanCode(
+    code: string,
+    filename: string,
+    originalCode?: string,
+    antibodies: AntibodyEntry[] = []
+  ): HydrophobiaReport {
     const violations: HydrophobiaViolation[] = [];
     const isJsTs = /\.[cm]?[jt]sx?$/.test(filename);
     const isPy = /\.py$/.test(filename);
@@ -42,7 +100,37 @@ export class HydrophobiaEngine {
       }
     });
 
-    // 2. AST Parsing for JS/TS
+    // 2. Active Antibody Rules Matching
+    for (const antibody of antibodies) {
+      try {
+        const regex = new RegExp(antibody.rejection_pattern, 'i');
+        if (regex.test(code)) {
+          violations.push({
+            file: filename,
+            type: 'ANTIBODY_VIOLATION',
+            message: `Antibody ${antibody.id} breached: ${antibody.underlying_flaw} (matched rule: ${antibody.rejection_pattern})`,
+            severity: 'FATAL'
+          });
+        }
+      } catch {
+        // If regex fails to compile, evaluate as JS expression
+        try {
+          const fn = new Function('code', `return Boolean(${antibody.rejection_pattern});`);
+          if (fn(code)) {
+            violations.push({
+              file: filename,
+              type: 'ANTIBODY_VIOLATION',
+              message: `Antibody ${antibody.id} breached: ${antibody.underlying_flaw}`,
+              severity: 'FATAL'
+            });
+          }
+        } catch {
+          // Ignore evaluation errors
+        }
+      }
+    }
+
+    // 3. AST Parsing for JS/TS
     if (isJsTs) {
       try {
         const ast = parser.parse(code, {
@@ -53,25 +141,24 @@ export class HydrophobiaEngine {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (traverse as any)(ast, {
-          Function: (path: any) => {
-            const body = path.node.body;
-            const funcName = path.node.id?.name || 
-              (path.parent?.type === 'VariableDeclarator' ? path.parent.id?.name : '<anonymous>');
+          Function: (pathNode: any) => {
+            const body = pathNode.node.body;
+            const funcName = pathNode.node.id?.name || 
+              (pathNode.parent?.type === 'VariableDeclarator' ? pathNode.parent.id?.name : '<anonymous>');
 
-            // Ignore trivial callbacks like array filters / short arrows
-            if (path.node.type === 'ArrowFunctionExpression' && body.type !== 'BlockStatement') {
+            if (pathNode.node.type === 'ArrowFunctionExpression' && body.type !== 'BlockStatement') {
               return;
             }
 
-            if (body.type === 'BlockStatement') {
+            if (body && body.type === 'BlockStatement') {
               const statements = body.body;
 
               // Empty function body
-              if (statements.length === 0 && !path.node.generator && !path.parent?.type?.includes('Interface')) {
+              if (statements.length === 0 && !pathNode.node.generator && !pathNode.parent?.type?.includes('Interface')) {
                 if (funcName !== '<anonymous>' && !funcName.startsWith('noop')) {
                   violations.push({
                     file: filename,
-                    line: path.node.loc?.start.line,
+                    line: pathNode.node.loc?.start.line,
                     type: 'EMPTY_FUNCTION_BODY',
                     message: `Function '${funcName}' has an empty body without implementation`,
                     snippet: `function ${funcName}() {}`,
@@ -93,12 +180,11 @@ export class HydrophobiaEngine {
                     (arg.type === 'ObjectExpression' && arg.properties.length === 0) ||
                     (arg.type === 'ArrayExpression' && arg.elements.length === 0);
 
-                  // If it's a non-trivial named function returning just true, false, 42, null, {}
                   const isSuspiciousName = !/^(is|has|can|should|get[A-Z]|default)/.test(funcName);
                   if (isLiteral && funcName !== '<anonymous>' && isSuspiciousName) {
                     violations.push({
                       file: filename,
-                      line: path.node.loc?.start.line,
+                      line: pathNode.node.loc?.start.line,
                       type: 'STATIC_CONSTANT_RETURN',
                       message: `Function '${funcName}' was replaced with a static constant return value`,
                       snippet: `return ${arg.raw || arg.value || arg.name || '{}'}`,
@@ -111,11 +197,11 @@ export class HydrophobiaEngine {
           }
         });
       } catch {
-        // If Babel fails to parse, fallback to regex inspection
+        // Fallback to regex inspection
       }
     }
 
-    // 3. Python Fallback Scanning
+    // 4. Python Fallback Scanning
     if (isPy) {
       const pythonTrivialFunc = /def\s+([a-zA-Z0-9_]+)\([^)]*\):\s*(pass|\.\.\.|return True|return False|return 0|return None|return \{\}|return \[\])\s*$/;
       lines.forEach((line, idx) => {
@@ -136,7 +222,7 @@ export class HydrophobiaEngine {
       });
     }
 
-    // 4. Differential Test Assertion Removal Check
+    // 5. Differential Test Assertion Removal Check
     if (originalCode) {
       const deletedAssertions = this.detectDeletedAssertions(originalCode, code, filename);
       violations.push(...deletedAssertions);
@@ -153,7 +239,7 @@ export class HydrophobiaEngine {
   /**
    * Scans a git diff text for deleted assertions or stripped validations
    */
-  public scanDiff(diffText: string): HydrophobiaReport {
+  public scanDiff(diffText: string, antibodies: AntibodyEntry[] = []): HydrophobiaReport {
     const violations: HydrophobiaViolation[] = [];
     const lines = diffText.split('\n');
     let currentFile = 'unknown';
@@ -166,19 +252,19 @@ export class HydrophobiaEngine {
       } else if (line.startsWith('-') && !line.startsWith('---')) {
         const removedContent = line.substring(1).trim();
 
-        // Check if a test assertion or verification was deleted
+        // Check if a test assertion, invariant, or @enforced decorator was deleted
         const assertionPatterns = [
           /\bexpect\s*\(/,
           /\bassert(\.|\s+|\()/,
           /\bassert_called\b/,
           /\.to(\.equal|\.be|\.have|\.match|\.throw)/,
           /\bshould\b/,
-          /\bself\.assert[A-Za-z]+\(/
+          /\bself\.assert[A-Za-z]+\(/,
+          /@(?:raebyes\.)?enforced\b/
         ];
 
         for (const ap of assertionPatterns) {
           if (ap.test(removedContent)) {
-            // Verify if it was just replaced on the next line or genuinely removed
             const nextLine = lines[i + 1];
             const isReplacedAssertion = nextLine && nextLine.startsWith('+') && ap.test(nextLine);
 
@@ -186,26 +272,11 @@ export class HydrophobiaEngine {
               violations.push({
                 file: currentFile,
                 type: 'DELETED_TEST_ASSERTION',
-                message: `Agent deleted test assertion: "${removedContent}"`,
+                message: `Agent deleted test assertion or @enforced gate: "${removedContent}"`,
                 snippet: line,
                 severity: 'FATAL'
               });
             }
-          }
-        }
-
-        // Check if an agent removed exception throwing or runtime guard
-        if (/\bthrow new\s+[A-Za-z]+Error\(/.test(removedContent) || /\braise\s+[A-Za-z]+Error\(/.test(removedContent)) {
-          const nextLine = lines[i + 1];
-          const isReplaced = nextLine && nextLine.startsWith('+') && (/throw/i.test(nextLine) || /raise/i.test(nextLine));
-          if (!isReplaced) {
-            violations.push({
-              file: currentFile,
-              type: 'SHORTCUT_MOCK_DETECTED',
-              message: `Agent stripped runtime exception/invariant check: "${removedContent}"`,
-              snippet: line,
-              severity: 'FATAL'
-            });
           }
         }
       }
@@ -226,7 +297,8 @@ export class HydrophobiaEngine {
     const assertionRegexes = [
       { name: 'expect() assertions', reg: /\bexpect\s*\(/g },
       { name: 'assert statements', reg: /\bassert(\.|\s+|\()/g },
-      { name: 'python unittest asserts', reg: /\bself\.assert[A-Za-z]+\(/g }
+      { name: 'python unittest asserts', reg: /\bself\.assert[A-Za-z]+\(/g },
+      { name: '@enforced decorators', reg: /@(?:raebyes\.)?enforced\b/g }
     ];
 
     for (const item of assertionRegexes) {
@@ -237,7 +309,7 @@ export class HydrophobiaEngine {
         violations.push({
           file: filename,
           type: 'DELETED_TEST_ASSERTION',
-          message: `Detected reduction in ${item.name} from ${beforeCount} to ${afterCount} (agent attempted to weaken test suite)`,
+          message: `Detected reduction in ${item.name} from ${beforeCount} to ${afterCount} (agent attempted to weaken assertions)`,
           severity: 'FATAL'
         });
       }

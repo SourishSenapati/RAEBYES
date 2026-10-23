@@ -6,6 +6,9 @@ import { HydrophobiaEngine } from '../engine/hydrophobia.js';
 import { VarianceGuard } from '../engine/variance-guard.js';
 import { CoreHubGraph } from '../engine/core-hub-graph.js';
 import { SpasmCircuitBreaker } from '../engine/spasm-breaker.js';
+import { TruthEnforcer } from '../engine/truth-enforcer.js';
+import { VaultHealer } from '../engine/vault-healer.js';
+import { AntibodyLedger } from '../ledger.js';
 
 export interface IPCRequest {
   id: string;
@@ -15,8 +18,13 @@ export interface IPCRequest {
     | 'CHECK_HYDROPHOBIA'
     | 'CHECK_DIFF'
     | 'CHECK_VARIANCE'
+    | 'CHECK_FRESHNESS'
+    | 'RECORD_READ'
     | 'ASSESS_RISK'
     | 'RECORD_BREACH'
+    | 'VERIFY_TURN'
+    | 'RECORD_RUN'
+    | 'AUTHORIZE_HEAL'
     | 'QUARANTINE'
     | 'RESET';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,10 +53,14 @@ export function getDefaultSocketPath(workspaceDir?: string): string {
 export class RaebyesSocketServer {
   private server: net.Server | null = null;
   private socketPath: string;
-  private hydrophobia: HydrophobiaEngine;
-  private varianceGuard: VarianceGuard;
-  private coreHubGraph: CoreHubGraph;
-  private breaker: SpasmCircuitBreaker;
+  private workspaceDir: string;
+  public hydrophobia: HydrophobiaEngine;
+  public varianceGuard: VarianceGuard;
+  public coreHubGraph: CoreHubGraph;
+  public breaker: SpasmCircuitBreaker;
+  public truthEnforcer: TruthEnforcer;
+  public vaultHealer: VaultHealer;
+  public ledger: AntibodyLedger;
 
   constructor(
     workspaceDir: string,
@@ -56,13 +68,20 @@ export class RaebyesSocketServer {
     hydrophobia?: HydrophobiaEngine,
     varianceGuard?: VarianceGuard,
     coreHubGraph?: CoreHubGraph,
-    breaker?: SpasmCircuitBreaker
+    breaker?: SpasmCircuitBreaker,
+    truthEnforcer?: TruthEnforcer,
+    vaultHealer?: VaultHealer,
+    ledger?: AntibodyLedger
   ) {
-    this.socketPath = customSocketPath || getDefaultSocketPath(workspaceDir);
+    this.workspaceDir = path.resolve(workspaceDir);
+    this.socketPath = customSocketPath || getDefaultSocketPath(this.workspaceDir);
+    this.breaker = breaker || new SpasmCircuitBreaker({ workspaceDir: this.workspaceDir });
     this.hydrophobia = hydrophobia || new HydrophobiaEngine();
     this.varianceGuard = varianceGuard || new VarianceGuard();
-    this.coreHubGraph = coreHubGraph || new CoreHubGraph(workspaceDir);
-    this.breaker = breaker || new SpasmCircuitBreaker({ workspaceDir });
+    this.coreHubGraph = coreHubGraph || new CoreHubGraph(this.workspaceDir);
+    this.truthEnforcer = truthEnforcer || new TruthEnforcer(this.workspaceDir);
+    this.vaultHealer = vaultHealer || new VaultHealer(this.workspaceDir, this.breaker);
+    this.ledger = ledger || new AntibodyLedger(this.workspaceDir);
   }
 
   public start(): Promise<string> {
@@ -148,27 +167,45 @@ export class RaebyesSocketServer {
 
         case 'STATUS': {
           const status = this.breaker.getStatus();
+          const treeHash = this.truthEnforcer.computeWorkingTreeHash();
+          const latestRun = this.ledger.getLatestVerifiedReceipt();
           return {
             id: req.id,
             success: true,
             data: {
               ...status,
               socketPath: this.socketPath,
-              uptimeSec: process.uptime()
+              uptimeSec: process.uptime(),
+              currentTreeHash: treeHash,
+              latestRun
             }
           };
         }
 
         case 'CHECK_HYDROPHOBIA': {
           const { code, filename, originalCode } = req.payload || {};
-          const report = this.hydrophobia.scanCode(code || '', filename || 'temp.ts', originalCode);
+          const antibodies = this.ledger.readEntries();
+          const report = this.hydrophobia.scanCode(code || '', filename || 'temp.ts', originalCode, antibodies);
           return { id: req.id, success: true, data: report };
         }
 
         case 'CHECK_DIFF': {
           const { diffText } = req.payload || {};
-          const report = this.hydrophobia.scanDiff(diffText || '');
+          const antibodies = this.ledger.readEntries();
+          const report = this.hydrophobia.scanDiff(diffText || '', antibodies);
           return { id: req.id, success: true, data: report };
+        }
+
+        case 'CHECK_FRESHNESS': {
+          const { filePath } = req.payload || {};
+          const fresh = this.hydrophobia.checkFreshness(filePath || '', this.workspaceDir);
+          return { id: req.id, success: true, data: fresh };
+        }
+
+        case 'RECORD_READ': {
+          const { filePath } = req.payload || {};
+          this.hydrophobia.recordRead(filePath || '');
+          return { id: req.id, success: true, data: { recorded: true, filePath } };
         }
 
         case 'CHECK_VARIANCE': {
@@ -181,6 +218,23 @@ export class RaebyesSocketServer {
           const { path: targetPath, action } = req.payload || {};
           const risk = this.coreHubGraph.assessMutationRisk(targetPath || '', action || 'PATCH');
           return { id: req.id, success: true, data: risk };
+        }
+
+        case 'VERIFY_TURN': {
+          const check = this.truthEnforcer.verifyTurn(this.breaker);
+          return { id: req.id, success: true, data: check };
+        }
+
+        case 'RECORD_RUN': {
+          const { command, stdout, durationMs } = req.payload || {};
+          const receipt = this.truthEnforcer.recordPassingRun(command || '', stdout || '', durationMs || 0);
+          return { id: req.id, success: true, data: receipt };
+        }
+
+        case 'AUTHORIZE_HEAL': {
+          const { relPath, content } = req.payload || {};
+          this.vaultHealer.authorizeMutation(relPath, content);
+          return { id: req.id, success: true, data: { updated: true } };
         }
 
         case 'RECORD_BREACH': {
@@ -213,9 +267,6 @@ export class RaebyesSocketServer {
   }
 }
 
-/**
- * Client helper to send a command to a running raebyesd daemon
- */
 export function sendDaemonCommand(
   action: IPCRequest['action'],
   payload?: unknown,

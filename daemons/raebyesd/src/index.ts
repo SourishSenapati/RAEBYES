@@ -1,18 +1,23 @@
 import * as path from 'path';
 import * as fs from 'fs';
+import * as url from 'url';
 import { HydrophobiaEngine } from './engine/hydrophobia.js';
 import { VarianceGuard } from './engine/variance-guard.js';
 import { CoreHubGraph } from './engine/core-hub-graph.js';
 import { SpasmCircuitBreaker } from './engine/spasm-breaker.js';
+import { TruthEnforcer } from './engine/truth-enforcer.js';
+import { VaultHealer } from './engine/vault-healer.js';
+import { AntibodyLedger } from './ledger.js';
 import { RaebyesSocketServer, getDefaultSocketPath, sendDaemonCommand } from './ipc/socket-server.js';
 
-import * as url from 'url';
-
-export * from './engine/types.js';
+export * from './types.js';
+export { AntibodyLedger, GENESIS_HASH } from './ledger.js';
 export { HydrophobiaEngine } from './engine/hydrophobia.js';
 export { VarianceGuard } from './engine/variance-guard.js';
 export { CoreHubGraph } from './engine/core-hub-graph.js';
 export { SpasmCircuitBreaker } from './engine/spasm-breaker.js';
+export { TruthEnforcer } from './engine/truth-enforcer.js';
+export { VaultHealer } from './engine/vault-healer.js';
 export { RaebyesSocketServer, getDefaultSocketPath, sendDaemonCommand } from './ipc/socket-server.js';
 
 // CLI Execution check: only execute if invoked directly as the daemon binary
@@ -24,7 +29,6 @@ const isMain = Boolean(
 );
 
 if (isMain) {
-  // Enforce argv[0] identification in process table
   process.title = 'raebyesd';
 
   const args = process.argv.slice(2);
@@ -55,10 +59,17 @@ if (isMain) {
   console.log(`[raebyesd] IPC Socket: ${socketPath}`);
   console.log(`[raebyesd] Hydrophobic Mode: ${hydrophobicMode ? 'ACTIVE (Zero-Tolerance)' : 'STANDARD'}`);
 
+  const ledger = new AntibodyLedger(workspaceDir);
+  const breaker = new SpasmCircuitBreaker({ workspaceDir });
   const hydrophobia = new HydrophobiaEngine();
   const varianceGuard = new VarianceGuard();
   const coreHubGraph = new CoreHubGraph(workspaceDir);
-  const breaker = new SpasmCircuitBreaker({ workspaceDir });
+  const truthEnforcer = new TruthEnforcer(workspaceDir);
+  const vaultHealer = new VaultHealer(workspaceDir, breaker);
+
+  // Arm Golden Snapshot vault healer
+  vaultHealer.armVault();
+  console.log('[raebyesd] VaultHealer armed: in-memory golden snapshots active for hook files.');
 
   // Load or build graph.lock
   const lockPath = path.join(workspaceDir, '.raebyes', 'graph.lock');
@@ -80,19 +91,23 @@ if (isMain) {
     hydrophobia,
     varianceGuard,
     coreHubGraph,
-    breaker
+    breaker,
+    truthEnforcer,
+    vaultHealer,
+    ledger
   );
 
   server.start().then((listeningPath) => {
     console.log(`[raebyesd] IPC Server listening at ${listeningPath}`);
-    console.log('[raebyesd] Ready for incoming tool calls, diff scans, and pre-flight gates.\n');
+    console.log('[raebyesd] Deterministic anti-shortcut engine active and guarding workspace.\n');
   }).catch((err) => {
     console.error(`[raebyesd] FATAL: Failed to start IPC server: ${err.message}`);
     process.exit(1);
   });
 
   const cleanup = async () => {
-    console.log('\n[raebyesd] Received shutdown signal. Stopping server cleanly...');
+    console.log('\n[raebyesd] Received shutdown signal. Disarming vault and stopping server...');
+    vaultHealer.disarm();
     await server.stop();
     process.exit(0);
   };
@@ -103,6 +118,7 @@ if (isMain) {
     process.on('SIGHUP', async () => {
       console.log('[raebyesd] Received SIGHUP. Reloading dependency graph and configurations...');
       await coreHubGraph.buildGraph();
+      vaultHealer.armVault();
     });
   }
 }

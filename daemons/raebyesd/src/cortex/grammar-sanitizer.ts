@@ -9,8 +9,8 @@ export class GrammarSanitizer {
 
     let cleaned = raw.trim();
 
-    // 1. Strip <think>...</think> or other model thinking blocks
-    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    // 1. Strip <think>...</think>, <thought>...</thought>, or reasoning scratchpads
+    cleaned = cleaned.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
 
     // 2. Strip markdown fences (```json ... ``` or ``` ...)
     const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);

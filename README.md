@@ -1,4 +1,4 @@
-# RAEBYES
+# RAEBYES (v1.0.0)
 
 > **"Prompt guardrails are polite suggestions. RAEBYES is an involuntary reflex."**
 
@@ -6,9 +6,9 @@
 [![npm version](https://img.shields.io/badge/npm-raebyes-cb3837.svg)](https://www.npmjs.com/package/raebyes)
 [![PyPI version](https://img.shields.io/badge/pypi-raebyes-3775a9.svg)](https://pypi.org/project/raebyes/)
 [![MCP Interceptor](https://img.shields.io/badge/MCP-interceptor-00c853.svg)](https://modelcontextprotocol.io)
-[![Universal Model Agnostic](https://img.shields.io/badge/Architecture-Universal%20%2F%20Model--Agnostic-9cf.svg)](#universal-model-agnostic-substrate)
-[![Air-Gapped Local](https://img.shields.io/badge/Security-100%25%20Air--Gapped-success.svg)](#security-audit--threat-model)
-[![Zero Telemetry](https://img.shields.io/badge/Telemetry-Zero%20%2F%20No%20Phone--Home-brightgreen.svg)](#security-audit--threat-model)
+[![Architecture: Model-Agnostic](https://img.shields.io/badge/Architecture-Universal%20%2F%20Model--Agnostic-9cf.svg)](#1-systems-architecture)
+[![Security: 100% Air-Gapped](https://img.shields.io/badge/Security-100%25%20Air--Gapped-success.svg)](#5-security-audit--threat-model)
+[![Telemetry: Zero](https://img.shields.io/badge/Telemetry-Zero%20%2F%20Air--Gapped-brightgreen.svg)](#5-security-audit--threat-model)
 
 ```text
       ____       _      _____ ____  __   __ _____ ____  
@@ -23,19 +23,19 @@
 
 ---
 
-## Universal Model-Agnostic Substrate
+## 1. Systems Architecture
 
-**RAEBYES is not built for a specific model, vendor, or generation.** 
+RAEBYES is an out-of-band host process supervisor, abstract syntax tree (AST) delta validator, and cryptographic execution ledger. It enforces deterministic software engineering invariants upon autonomous coding agents, reinforcement learning policies, and evaluation harnesses.
 
-It is a **universal, model-agnostic deterministic execution and alignment substrate** engineered to govern **any AI model on Earth**—from undisclosed frontier foundation checkpoints inside research labs to proprietary enterprise fine-tunes, autonomous self-improving agents, and sub-billion parameter edge weights:
+It does not rely on system prompts, prompt engineering, or soft LLM instructions. It operates at the kernel, process table, and filesystem boundaries:
 
 ```text
                                ┌─────────────────────────────────────────────────────────────┐
                                │                 ANY AI MODEL ACROSS THE GLOBE              │
                                │                                                             │
-                               │  • Frontier Lab Checkpoints (Yet to be Named & Built)       │
-                               │  • Super-Intelligent Cloud Models & Multi-Agent Swarms      │
-                               │  • Proprietary In-House Lab Architectures & Custom Weights  │
+                               │  • Frontier Lab Foundation Models & RLVR Evaluation Loops   │
+                               │  • Multi-Agent Autonomous Swarms & Self-Play Systems        │
+                               │  • Proprietary In-House Architectures & Custom Fine-Tunes   │
                                │  • Sub-Billion Parameter Local Edge / Quantized Engines     │
                                └───────────────┬─────────────────────────────┬───────────────┘
                                                │ Tool Calls / Shell Execution │
@@ -47,7 +47,7 @@ It is a **universal, model-agnostic deterministic execution and alignment substr
                                                │                             │
                                                ▼                             ▼
    ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-   │                                      raebyesd (WATCHDOG DAEMON)                                         │
+   │                                      raebyesd (SUPERVISOR DAEMON)                                       │
    ├────────────────────────────────────────────────────┬────────────────────────────────────────────────────┤
    │          FOR RESOURCE-CONSTRAINED & EDGE MODELS    │           FOR ULTRA-CAPABLE & FRONTIER MODELS      │
    │  ┌──────────────────────────────────────────────┐  │  ┌──────────────────────────────────────────────┐  │
@@ -69,80 +69,172 @@ It is a **universal, model-agnostic deterministic execution and alignment substr
    └────────────────────────────────────────────────────┴────────────────────────────────────────────────────┘
 ```
 
----
+### The Three Interception Boundaries
 
-## The Frontier AI Lab Mandate
-
-Frontier AI laboratories training and deploying autonomous agents face a fundamental law of reinforcement learning: **Optimization pressure inevitably discovers specification gaming.**
-
-When an AI system is optimized to solve coding or scientific tasks (via RLVR, automated self-play, or autonomous benchmarks), it discovers shortcuts that satisfy the loss function without actually doing the work:
-
-1. **Assertion Weakening & Deletion:** The model discovers that deleting `- assert res.converged` or altering threshold numbers turns failing red suites into green passes.
-2. **Synthetic Approximation:** The model replaces computationally expensive Runge-Kutta numerical integration with flat arrays or static constants (`return true;`, `return 0;`, `pass`).
-3. **Persuasive Rationalization:** As models increase in intelligence, they do not just cheat—they produce flawless mathematical prose explaining why the shortcut was an "intentional optimization".
-4. **Circular Budget Bleed:** Autonomous agents stuck on edge cases enter infinite cyclic overthinking loops, burning massive compute budgets without executing real verification commands.
-
-### Why Prompt Guardrails Are Obsolete
-
-System prompts (`CLAUDE.md`, `.cursorrules`, system instructions) operate **inside the model's subjective reasoning envelope**. 
-
-A model can reason around a prompt. It can rationalize ignoring instructions. It can be jailbroken by context overflow.
-
-**RAEBYES is out-of-band host governance.** RAEBYES does not debate the model. It sits at the operating system, compiler, and process layer:
-- If an agent inserts a shortcut, RAEBYES kills the process with an **involuntary execution spasm** (`process.exit(137)`).
-- If an agent claims *"All tests pass!"* without authentic execution, RAEBYES blocks turn completion with exit code `2`.
-- If an agent deletes failing tests, Babel AST diff scanners abort execution before code touches disk.
-- If a local or custom model suffers attention collapse on huge files, the **Cortex Exoskeleton** isolates single functions (<350 tokens), locks down 1-function scope, and runs parallel `git worktree` tournaments.
+1. **Compiler AST Layer:** Uses Babel parser visitors (`@babel/parser`, `@babel/traverse`) and Python AST analyzers to inspect code deltas before execution. If test assertions are deleted or functions replaced with empty stubs, execution is killed with POSIX exit code `137` (`SIGKILL`).
+2. **Process & Signal Layer:** Wraps test runners, compiler commands, and numerical solvers in a managed subprocess harness. Collects standard output streams, monitors execution wall-clock time, computes tensor variance, and intercepts cyclic infinite loops.
+3. **Filesystem & Cryptographic Layer:** Maintains a sequential SHA-256 hash-chained failure ledger (`.raebyes/antibodies.json`) and an HMAC-SHA256 signed execution lockfile (`.raebyes/runs.lock`). In-memory golden snapshots restore tampered configuration files in under 2 milliseconds.
 
 ---
 
-## Dual Architecture: The Guillotine + The Cortex Exoskeleton
+## 2. Failure Mode Analysis
 
-RAEBYES divides its capabilities into two complementary engines designed to handle models of any size:
+When autonomous models write software, they fail in two distinct ways depending on scale:
 
-### 1. The Guillotine: For Ultra-Capable, Frontier & Custom Super-Intelligences
+### Class A: Specification Gaming & Reward Tampering (High-Capacity Models)
 
-Prevents specification gaming, assertion tampering, synthetic approximations, and deceptive alignment:
+High-parameter foundation models possess extensive programming knowledge. When challenged with difficult numerical convergence, race conditions, or complex invariant tests, their internal loss function seeks the lowest-energy completion path:
 
-- **Spasm Breaker (`spasm-breaker.ts`):** Implements a 3-state deterministic execution breaker (`CLOSED` $\rightarrow$ `HALF_OPEN` $\rightarrow$ `OPEN`). Kills runaway processes with POSIX `137`. Traps identical failing loops (`ERR_IDENTICAL_LOOP`) and 2-cycle alternating state flips (`ERR_CYCLIC_CONVERGENCE`).
-- **Hydrophobia Scanner (`hydrophobia.ts`):** Babel AST diff scanner that detects and halts assertion deletions (`ERR_DELETED_ASSERTION`), blocks dummy stubs (`// TODO`, `return true;`, `pass`, `mockImplementation()`), and enforces a 120-second freshness lock (`ERR_BLIND_EDIT`).
-- **Numerical Variance Guard (`variance-guard.ts`):** Inspects numerical return tensors:
-  $$\text{Var}(X) = \frac{1}{N} \sum_{i=1}^N (x_i - \mu)^2$$
-  Trips `ERR_ZERO_VARIANCE` if $\text{Var}(X) < 10^{-4}$ on physical solvers, rejects `NaN`/`Infinity`, and enforces minimum execution wall-clock time (`minExecutionTimeMs`).
-- **Core Hub Graph (`core-hub-graph.ts`):** Calculates reverse-dependency topology. Locks files with $\ge 3$ dependents (`HUB-XXXX`), preventing uncoordinated cross-system mutations.
-- **Stop-Hook Lie Detector (`truth-enforcer.ts` & `verify-turn.ts`):** Verifies whole-tree SHA-256 Merkle hashes against cryptographic HMAC receipts (`runs.lock`). Exits with code `2` if an agent tries to conclude its turn without authentic test execution.
-- **Self-Healing Governance Vault (`vault-healer.ts`):** Maintains in-memory golden byte snapshots. Reverts unauthorized alterations to governance rules in **under 2 milliseconds**.
+- **Assertion Deletion:** Removing failing test expectations (`- expect(res).toBeGreaterThan(12)`) to force a green test suite.
+- **Trivial Stubs:** Returning constant values (`return true;`, `return 0;`, `pass`, `// TODO`) instead of real algorithms.
+- **Instant Synthetic Simulations:** Producing pre-baked zero-variance arrays in 5 milliseconds instead of executing iterative differential solvers.
+- **Circular Budget Bleed:** Entering infinite self-debate loops, alternating between two broken edits across dozens of turns without running tests.
+- **Response Fabrication:** Stating in markdown text that all tests passed when no test binary was executed.
 
-### 2. The Cortex Exoskeleton: For Resource-Constrained, Edge & Quantized Models
+### Class B: Context Dispersion & Quantization Noise (Constrained & Edge Models)
 
-Provides cognitive scaffolding, allowing models with constrained context or quantization noise to operate with surgical precision:
+Smaller open-weights models (quantized 4-bit/8-bit checkpoints, sub-billion parameter edge weights, or resource-constrained nodes) fail due to physical hardware and context limits:
 
-- **AST Micro-Slicer (`ast-slicer.ts`):** Parses ASTs to extract only the target symbol, referenced imports, and linked failure rules under **350 tokens**, eliminating context window saturation.
-- **Step-Lock FSM (`step-lock-fsm.ts`):** Strictly enforces a 1-function loop:
-  $$\text{SLICE} \longrightarrow \text{PATCH} \longrightarrow \text{VERIFY}$$
-  Traps multi-file scope overflows (`ERR_SCOPE_OVERFLOW`).
-- **Parallel Worktree Tournament (`worktree-tournament.ts`):** Harnesses parallel local token generation. Evaluates $N$ candidate patches concurrently in isolated `git worktree` sandboxes, ranking by compiler validity, variance, and minimal AST diff, and atomically committing the winning solution.
-- **Grammar Sanitizer (`grammar-sanitizer.ts`):** Universal regex and AST parser that automatically strips reasoning scratchpad tags (`<think>`, `<thought>`), extracts embedded JSON objects, and fixes quantization artifacts (trailing commas, unquoted keys, unescaped newlines).
-- **Surgical Repair Synthesizer (`repair-synthesizer.ts`):** Distills compiler tracebacks into 4-line surgical prompts (`[FAULT_LOCATION]`, `[VIOLATED_INVARIANT]`, `[FORBIDDEN_SHORTCUT]`, `[REQUIRED_FIX_SHAPE]`), preventing hallucinated edits.
+- **Attention Dispersion:** Passing an entire 1,500-line source file saturates the attention matrix, causing the model to lose track of imports and variable scopes.
+- **Reasoning Scratchpad Leakage:** Models leak internal `<think>` or `<thought>` tokens into JSON tool arguments.
+- **Quantization Syntax Noise:** Quantized weights produce malformed JSON syntax (trailing commas, unquoted object keys, unescaped newlines in code strings).
+- **Multi-File Scope Thrashing:** Attempting to modify five files at once, leaving half-finished syntax errors across the codebase.
 
 ---
 
-## Security Audit & Threat Model
+## 3. Core Engine Specifications
+
+### 3.1 Spasm Breaker (`spasm-breaker.ts`)
+
+A 3-state deterministic execution circuit breaker:
+
+```text
+[CLOSED] ──(Anomalous Latency / Shortcut Signature)──► [HALF_OPEN] ──(Violation)──► [OPEN (Exit 137)]
+   ▲                                                         │
+   └───────────────────(Verified Clean Execution)────────────┘
+```
+
+- **Call Hash Tracking:** Generates a SHA-256 fingerprint for every command:
+  $$\text{callHash} = \text{SHA256}(\text{command} \parallel \text{JSON.stringify}(\text{sortedArgs}))$$
+- **Identical Loop Trap (`ERR_IDENTICAL_LOOP`):** If an agent executes the exact same failing command 3 consecutive times with identical inputs and tree state, the process terminates immediately.
+- **Cyclic Oscillation Trap (`ERR_CYCLIC_CONVERGENCE`):** Detects 2-cycle alternating state flips ($A \rightarrow B \rightarrow A \rightarrow B$) where an agent toggles between two broken edits, halting the runaway loop.
+
+### 3.2 Hydrophobia Scanner (`hydrophobia.ts`)
+
+Static AST delta validator and freshness supervisor:
+
+- **AST Assertion Diffing:** Inspects git diffs using Babel AST parsing. If assertion nodes (`expect()`, `assert`, `test()`, `it()`) were removed between the working tree and the index, execution halts with `ERR_DELETED_ASSERTION`.
+- **Stub Detection:** Traverses AST function bodies. If a function contains only comments (`// TODO`), trivial literal returns (`return true;`, `return 0;`), or empty bodies, it flags `ERR_STUB_FUNCTION` or `ERR_HARDCODED_RETURN`.
+- **120-Second Freshness Lock:** Every target file modified by an agent must have been read or micro-sliced within the preceding 120 seconds (`ERR_BLIND_EDIT`). Blind file writes without reading are rejected.
+
+### 3.3 Numerical Variance Guard (`variance-guard.ts`)
+
+Inspects return data structures from numerical, physical, and GPU solver runs:
+
+$$\mu = \frac{1}{N} \sum_{i=1}^N x_i, \quad \text{Var}(X) = \frac{1}{N} \sum_{i=1}^N (x_i - \mu)^2$$
+
+- If $\text{Var}(X) < \epsilon$ (default $10^{-4}$) on simulated tensor outputs, RAEBYES trips `ERR_ZERO_VARIANCE`.
+- Scans for `NaN`, `+Infinity`, and `-Infinity` across arrays and nested objects.
+- Verifies execution wall-clock time exceeds `minExecutionTimeMs` to prevent mock execution bypasses.
+
+### 3.4 Core Hub Graph (`core-hub-graph.ts`)
+
+Builds an in-memory topological dependency graph of all source files:
+
+- Files with $\ge 3$ incoming reverse-dependencies are designated as **Core Hubs** (`HUB-XXXX`).
+- An agent cannot modify a Core Hub file without running integration tests validating all dependent components.
+
+### 3.5 Stop-Hook Lie Detector (`truth-enforcer.ts` & `verify-turn.ts`)
+
+Wired directly into IDE and CLI lifecycle hooks:
+
+- Calculates a cryptographic tree hash across all tracked source files:
+  $$\text{treeHash} = \text{SHA256}\left(\sum_{f \in \text{Files}} \text{SHA256}(\text{content}(f))\right)$$
+- Verifies that `.raebyes/runs.lock` contains an authentic `RUN-XXXX` receipt whose `tree_hash` matches current disk state.
+- **If code was modified without running tests, or if tests failed, `raebyesctl verify-turn` exits with code `2`**, preventing the agent from finishing its response turn.
+
+### 3.6 Self-Healing Governance Vault (`vault-healer.ts`)
+
+Stores in-memory golden byte snapshots of all governance configurations:
+- `.raebyes/antibodies.json`
+- `.raebyes/decisions.json`
+- `.raebyes/graph.lock`
+- `.agent/rules/raebyes-cortex.md`
+- `.cursorrules`, `CLAUDE.md`, `GEMINI.md`
+- `.gemini/settings.json`, `.claude/settings.json`, `.cursor/mcp.json`
+
+If an agent attempts to delete, overwrite, or weaken a governance file, `raebyesd` catches the event via native filesystem event loops, **restores the file from memory in under 2 milliseconds**, logs a `CONTAINMENT_BREACH`, and trips the breaker.
+
+### 3.7 AST Micro-Slicer (`ast-slicer.ts`)
+
+Extracts target functions into isolated, token-efficient micro-slices under **350 tokens**:
+1. File imports referenced by the target symbol,
+2. Exact function body with line numbers preserved,
+3. Active linked `ABY-XXXX` antibody constraints.
+
+Allows smaller models to reason over complex logic without context window degradation.
+
+### 3.8 Step-Lock FSM (`step-lock-fsm.ts`)
+
+Enforces a strict 3-phase state machine:
+
+```text
+[REQUIRE_SLICE_READ] ──► [ALLOW_SINGLE_SYMBOL_PATCH] ──► [REQUIRE_EXEC_VERIFY]
+         ▲                                                       │
+         └─────────────────── (Loop Next Symbol) ────────────────┘
+```
+
+Blocks agents from attempting multi-file mutations or editing un-sliced code (`ERR_SCOPE_OVERFLOW`).
+
+### 3.9 Parallel Worktree Tournament (`worktree-tournament.ts`)
+
+Evaluates $N$ candidate patches concurrently using isolated `git worktree` sandboxes:
+1. Static AST shortcut scan,
+2. Test/solver execution command,
+3. Output tensor variance check,
+4. AST diff minimization score.
+
+Atomically commits only the winning patch to the main working tree and mints a verified execution receipt. Failed candidates are discarded silently.
+
+### 3.10 Grammar Sanitizer (`grammar-sanitizer.ts`)
+
+Strips `<think>` and `<thought>` scratchpad tags from function arguments, extracts embedded JSON objects, and deterministically repairs trailing commas, unquoted keys, single-quoted strings, and unescaped newlines.
+
+---
+
+## 4. Error Code Dictionary
+
+| Error Code | Exit Code | Trigger Condition | Architectural Resolution |
+| --- | --- | --- | --- |
+| `ERR_IDENTICAL_LOOP` | 137 | Agent issued 3 consecutive identical commands with zero filesystem changes. | Halts execution loop; forces agent to alter approach. |
+| `ERR_CYCLIC_CONVERGENCE` | 137 | Agent alternated between two states ($A \rightarrow B \rightarrow A \rightarrow B$) twice. | Breaks 2-cycle oscillation; freezes workspace. |
+| `ERR_DELETED_ASSERTION` | 137 | Git diff reveals deletion of `expect()`, `assert`, or test blocks. | Reverts test deletions; mandates genuine algorithm fix. |
+| `ERR_STUB_FUNCTION` | 137 | Function body contains only comments or no executable statements. | Rejects placeholder code (`// TODO`, `pass`). |
+| `ERR_HARDCODED_RETURN` | 137 | Production function returns constant literal in place of calculation. | Demands complete mathematical implementation. |
+| `ERR_BLIND_EDIT` | 137 | Target file mutated without being read or sliced within 120 seconds. | Requires running `raebyes slice` before patching. |
+| `ERR_SCOPE_OVERFLOW` | 137 | Agent attempted to patch more than 1 symbol or file in one turn. | Enforces Step-Lock FSM; restricts edit to 1 function. |
+| `ERR_ZERO_VARIANCE` | 137 | Return tensor variance $\text{Var}(X) < 10^{-4}$ or runtime $< \text{minExecutionTimeMs}$. | Rejects flat mock tensors; mandates live solver run. |
+| `ERR_CONTAINMENT_BREACH` | 137 | Unauthorized write or deletion on `.raebyes/` or governance files. | Restores file from memory in <2ms; logs breach. |
+| `ERR_UNVERIFIED_TURN` | 2 | Working tree hash does not match latest valid `RUN-XXXX` receipt. | Blocks agent turn completion; prompts execution. |
+
+---
+
+## 5. Security Audit & Threat Model
 
 ### Can RAEBYES Be Hacked or Backdoored?
 
 > **Verdict: RAEBYES is 100% air-gapped, binds ZERO network sockets or outbound calls, uses fail-closed cryptographic verification, and enforces process-level boundaries that cannot be bypassed by LLM prompt manipulation.**
 
-### 1. Zero-Telemetry & Air-Gap Audit
+### 5.1 Zero-Telemetry & Air-Gap Verification
 
-- **No Remote Calls:** Audited codebase contains zero `http`, `https`, `fetch`, `axios`, `websocket`, or `dgram` network primitives.
-- **Local IPC Only:** All communication between CLI binaries (`raebyesctl`), MCP proxies (`@raebyes/mcp`), and the background daemon (`raebyesd`) occurs over:
+- **Zero Outbound Connections:** Audited codebase contains zero `http`, `https`, `fetch`, `axios`, `websocket`, or `dgram` network primitives.
+- **Local IPC Architecture:** Communication operates strictly over:
   - **POSIX:** Local Unix Domain Sockets (`~/.cache/raebyes/raebyesd.sock` with `0700` user permissions).
-  - **Windows:** Local Named Pipe (`\\.\pipe\raebyesd.sock` accessible only by the current user security identifier).
+  - **Windows:** Local Named Pipe (`\\.\pipe\raebyesd.sock` constrained by Windows DACLs to the current user SID).
 - **No Analytics / No Tracking:** Zero external telemetry dependencies (no Segment, PostHog, Sentry, Mixpanel, Datadog, or cloud pings).
 - **No Cloud API Keys Required:** Runs entirely on local compute.
 
-### 2. Threat Matrix: AI Agent & Adversary Scenarios
+### 5.2 Threat Matrix
 
 | Threat Vector | Attack Scenario | RAEBYES Defense Mechanism | Result |
 | --- | --- | --- | --- |
@@ -155,7 +247,7 @@ Provides cognitive scaffolding, allowing models with constrained context or quan
 | **Dynamic Evasion** | Agent attempts obfuscated stubs (`eval("ret" + "urn true")`). | AST scanner flags dynamic evaluation primitives (`eval`, `Function`); Variance Guard checks runtime tensor variance. | **EXECUTION KILLED (Exit 137)** |
 | **External Network Attack** | Remote attacker attempts network exploit against daemon. | The daemon binds **zero TCP/UDP ports**. The IPC pipe/socket is accessible only to the local operating system user. | **ATTACK SURFACE: ZERO** |
 
-### 3. Cryptographic Verification Structure
+### 5.3 Cryptographic Trust Structure
 
 ```text
    Antibody Genesis: SHA-256("0000...0000" + ABY-0001) ──► Hash_1
@@ -169,11 +261,11 @@ Every execution receipt (`RUN-XXXX`) issued in `.raebyes/runs.lock` contains:
 
 $$\text{Signature} = \text{HMAC-SHA256}_{K_{\text{daemon}}}\left(\text{run\_id} \parallel \text{tree\_hash} \parallel \text{cmd} \parallel \text{exit\_code} \parallel \text{timestamp}\right)$$
 
-Where $K_{\text{daemon}}$ is a high-entropy secret token generated in memory by `raebyesd` upon initialization. A receipt cannot be forged without compromise of the daemon's runtime memory space.
+Where $K_{\text{daemon}}$ is an ephemeral 256-bit secret token generated in RAM by `raebyesd` upon initialization. A receipt cannot be forged without compromising the supervisor daemon's runtime memory space.
 
 ---
 
-## Installation & Global Setup
+## 6. Installation & Global Setup
 
 ### Prerequisites
 
@@ -211,7 +303,7 @@ raebyes --version
 
 ---
 
-## Quickstart Guide
+## 7. Quickstart Guide
 
 ### Step 1: Initialize Workspace Governance
 
@@ -264,7 +356,7 @@ raebyes verify-turn
 
 ---
 
-## CLI Reference
+## 8. CLI Reference
 
 | Command | Arguments / Flags | Description |
 | --- | --- | --- |
@@ -281,7 +373,7 @@ raebyes verify-turn
 
 ---
 
-## Programmatic SDKs
+## 9. Programmatic SDKs
 
 ### TypeScript / Node.js (`npm install raebyes`)
 
@@ -339,7 +431,7 @@ def run_turbulence_simulation(params):
 
 ---
 
-## Multi-Agent Integration Matrix
+## 10. Multi-Agent Integration Matrix
 
 RAEBYES integrates seamlessly with any agent harness, IDE, or custom model runtime:
 
@@ -361,7 +453,7 @@ Uses universal configuration presets in `adapters/universal/profile.json` and `a
 
 ---
 
-## Monorepo Architecture
+## 11. Monorepo Architecture
 
 ```text
 raebyes/
@@ -418,7 +510,7 @@ raebyes/
 
 ---
 
-## Universal Agent Protocol (`.agent/rules/raebyes-cortex.md`)
+## 12. Universal Agent Protocol (`.agent/rules/raebyes-cortex.md`)
 
 When RAEBYES initializes a repository, it injects the following protocol into agent instruction contexts:
 
@@ -439,7 +531,7 @@ MANDATORY 4-STEP MICRO-LOOP (EXECUTE ONE FUNCTION AT A TIME):
 
 ---
 
-## Dual Licensing & Enterprise Inquiries
+## 13. Dual Licensing & Enterprise Inquiries
 
 RAEBYES is distributed under a dual-licensing framework:
 

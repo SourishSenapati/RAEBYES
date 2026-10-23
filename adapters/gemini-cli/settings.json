@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "raebyes": {
+      "command": "npx",
+      "args": ["-y", "@raebyes/mcp"]
+    }
+  },
+  "runtimeGovernance": {
+    "interceptor": "@raebyes/mcp",
+    "circuitBreaker": true,
+    "blockSyntheticShortcuts": true,
+    "lockCoreHubs": true
+  }
+}

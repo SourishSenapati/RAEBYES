@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "raebyes"
+version = "1.0.0"
+description = "Rigid Agent Execution Breaker & Yield Error System - Deterministic runtime circuit breaker for Python & Scientific Agents"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "AGPL-3.0-or-later" }
+authors = [
+    { name = "RAEBYES Governance Team", email = "governance@raebyes.dev" }
+]
+keywords = ["ai-agents", "circuit-breaker", "scipy", "pytorch", "runtime-assertions", "guardrails"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+
+[project.urls]
+Homepage = "https://github.com/raebyes/raebyes"
+Documentation = "https://raebyes.dev"

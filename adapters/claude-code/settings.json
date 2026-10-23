@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/partial-claude-settings.json",
+  "mcpServers": {
+    "raebyes": {
+      "command": "npx",
+      "args": ["-y", "@raebyes/mcp"]
+    }
+  },
+  "hooks": {
+    "preExecution": "npx raebyes verify",
+    "postExecution": "npx raebyes status"
+  },
+  "governance": {
+    "enforceCircuitBreaker": true,
+    "fatalSpasmOnViolation": true
+  }
+}

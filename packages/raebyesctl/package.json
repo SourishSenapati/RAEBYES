@@ -1,0 +1,29 @@
+{
+  "name": "raebyesctl",
+  "version": "1.0.0",
+  "description": "Unified CLI Control Binary and Gatekeeper for RAEBYES",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "raebyes": "bin/raebyes.js",
+    "raebyesctl": "bin/raebyes.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "keywords": [
+    "raebyes",
+    "raebyesctl",
+    "cli",
+    "circuit-breaker",
+    "ai-agents"
+  ],
+  "author": "RAEBYES Governance Team",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@raebyes/daemon": "*",
+    "raebyes": "*"
+  }
+}

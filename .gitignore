@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.raebyes/trajectories/
+.raebyes/quarantine/
+.raebyes/raebyesd.sock
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+.venv/

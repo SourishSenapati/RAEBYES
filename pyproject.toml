@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "raebyes"
+version = "1.0.0"
+description = "RAEBYES — Rigid Agent Execution Breaker & Yield Error System"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "AGPL-3.0-or-later" }
+authors = [
+    { name = "RAEBYES Governance Team", email = "governance@raebyes.dev" }
+]
+
+[tool.setuptools.packages.find]
+where = ["packages/sdk-python"]

@@ -1,0 +1,25 @@
+{
+  "name": "raebyes",
+  "version": "1.0.0",
+  "description": "RAEBYES Core SDK - Deterministic runtime circuit breaker and anti-shortcut engine for AI agents",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "keywords": [
+    "raebyes",
+    "ai-agents",
+    "circuit-breaker",
+    "runtime-assertions",
+    "guardrails",
+    "mcp"
+  ],
+  "author": "RAEBYES Governance Team",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@raebyes/daemon": "*"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "raebyes-monorepo",
+  "version": "1.0.0",
+  "description": "RAEBYES — Rigid Agent Execution Breaker & Yield Error System",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "daemons/raebyesd",
+    "packages/raebyesctl",
+    "packages/mcp-interceptor",
+    "packages/sdk-js"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "node --test tests/raebyes.test.ts",
+    "test:python": "py tests/python_test.py",
+    "typecheck": "tsc --build"
+  },
+  "keywords": [
+    "ai-agent",
+    "circuit-breaker",
+    "guardrails",
+    "anti-shortcut",
+    "mcp",
+    "runtime-assertion",
+    "deterministic-governance"
+  ],
+  "author": "RAEBYES Governance Team",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "@babel/parser": "^8.0.7",
+    "@babel/traverse": "^8.0.7",
+    "@types/babel__traverse": "^7.28.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

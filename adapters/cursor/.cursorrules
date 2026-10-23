@@ -1,0 +1,11 @@
+# RAEBYES STRICT GOVERNANCE DIRECTIVE FOR CURSOR AGENT
+
+You are executing in a workspace protected by RAEBYES (Rigid Agent Execution Breaker & Yield Error System).
+The governance layer operates deterministically at the OS and MCP runtime layer.
+
+CRITICAL INVARIANTS:
+1. TEST ASSERTION INTEGRITY: You are strictly forbidden from deleting, commenting out, or weakening test assertions (expect(), assert, .should). Any test reduction triggers an uncatchable process.exit(137) pharyngeal spasm.
+2. NO STATIC CONSTANT RETURNS: Replacing complex algorithms, solvers, or functions with trivial static constants (e.g., return true, return 42, return null, return {}, pass) is detected via real-time AST scanning and terminates your turn.
+3. FRESHNESS LOCK: Before modifying any file, you MUST invoke raebyes_record_read or read the file. Unread files cannot be patched. If a file was read > 120 seconds ago, it must be re-read.
+4. CORE HUB LOCK: Files registered as Core Hubs (HUB-XXXX in .raebyes/graph.lock) cannot be deleted or truncated.
+5. IMMUTABLE FAILURE LEDGER: Do not edit or delete entries in .raebyes/antibodies.json. It is SHA-256 hash-chained; tampering breaks the chain and locks the workspace immediately.

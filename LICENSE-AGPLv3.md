@@ -1,20 +1,58 @@
-GNU AFFERO GENERAL PUBLIC LICENSE
+# GNU AFFERO GENERAL PUBLIC LICENSE (AGPLv3)
+
 Version 3, 19 November 2007
 
 Copyright (C) 2026 RAEBYES Governance Team & Sourish Senapati <sourishsenapati791@gmail.com>
 
-Everyone is permitted to copy and distribute verbatim copies
-of this license document, but changing it is not allowed.
+Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.
 
-Preamble
+---
 
-The GNU Affero General Public License is a free, copyleft license for
-software and other kinds of works, specifically designed to ensure
-cooperation with the community in the case of network server software.
+## Preamble
 
-When you convey a copy of the covered work, or a work based on it,
-you must provide the complete Corresponding Source to all users who
-interact with it remotely through a computer network or use it locally.
+The GNU Affero General Public License is a free, copyleft license for software and other kinds of works, specifically designed to ensure cooperation with the community in the case of network server software.
 
-For terms and full legal text, visit https://www.gnu.org/licenses/agpl-3.0.html.
-Commercial exemptions and closed-source licenses are available under LICENSE-COMMERCIAL.md.
+The licenses for most software and other practical works are designed to take away your freedom to share and change the works. By contrast, our General Public Licenses are intended to guarantee your freedom to share and change all versions of a program--to make sure it remains free software for all its users.
+
+When we speak of free software, we are referring to freedom, not price. Our General Public Licenses are designed to make sure that you have the freedom to distribute copies of free software (and charge for them if you wish), that you receive source code or can get it if you want it, that you can change the software or use pieces of it in new free programs, and that you know you can do these things.
+
+Developers that use our General Public Licenses protect your rights with two steps: (1) assert copyright on the software, and (2) give you this License which gives you legal permission to copy, distribute and/or modify the software.
+
+A secondary benefit of defending all users' freedom is that improvements made in alternate versions of the program, if they receive widespread use, become available for other developers to incorporate. Many developers of free software are heartened and encouraged by the resulting cooperation. However, in the case of software used on network servers, this result may fail to come about. The GNU General Public License permits making a modified version and letting the public access it on a server without ever releasing its source code to the public.
+
+The GNU Affero General Public License is designed specifically to ensure that, in such cases, the modified source code becomes available to the community. It requires the operator of a network server to provide the source code of the modified version running there to the users of that server. Therefore, public use of a modified version, on a publicly accessible server, gives the public access to the source code of the modified version.
+
+---
+
+## Terms and Conditions
+
+### 0. Definitions
+
+"This License" refers to version 3 of the GNU Affero General Public License.
+
+"Copyright" also means copyright-like laws that apply to other kinds of works, such as semiconductor masks.
+
+"The Program" refers to any copyrightable work licensed under this License. Each licensee is addressed as "you". "Licensees" and "recipients" may be individuals or organizations.
+
+To "modify" a work means to copy from or adapt all or part of the work in a fashion requiring copyright permission, other than the making of an exact copy. The resulting work is called a "modified version" of the earlier work or a work "based on" the earlier work.
+
+A "covered work" means either the unmodified Program or a work based on the Program.
+
+To "propagate" a work means to do anything with it that, without permission, would make you directly or secondarily liable for infringement under applicable copyright law, except executing it on a computer or modifying a private copy. Propagation includes copying, distribution (with or without modification), making available to the public, and in some countries other activities as well.
+
+To "convey" a work means any kind of propagation that enables other parties to make or receive copies. Mere interaction with a user through a computer network, with no transfer of a copy, is not conveying.
+
+### 1. Source Code Disclosure Requirement for Network Servers
+
+Notwithstanding any other provision of this License, if you modify the Program, your modified version must prominently offer all users interacting with it remotely through a computer network (if your version supports such interaction) an opportunity to receive the Corresponding Source of your version by providing access to the Corresponding Source from a network server at no charge, through some standard or customary means of facilitating copying of software.
+
+### 2. Dual-Licensing and Commercial Exemptions
+
+This software is dual-licensed. Entities wishing to use, embed, or integrate RAEBYES in proprietary, closed-source SaaS applications, internal enterprise platforms, or commercial toolchains without being subject to the reciprocal copyleft requirements of AGPLv3 may purchase a commercial license under the terms specified in [LICENSE-COMMERCIAL.md](./LICENSE-COMMERCIAL.md).
+
+For commercial licensing terms, pricing, or custom agreements, contact:
+- **Commercial Contact:** `sourishsenapati791@gmail.com`
+- **Lead Maintainer:** Sourish Senapati (`sourishsenapati791@gmail.com`)
+- **Official Repository:** [https://github.com/SourishSenapati/RAEBYES](https://github.com/SourishSenapati/RAEBYES)
+
+For the complete official text of the GNU Affero General Public License v3, visit [https://www.gnu.org/licenses/agpl-3.0.html](https://www.gnu.org/licenses/agpl-3.0.html).

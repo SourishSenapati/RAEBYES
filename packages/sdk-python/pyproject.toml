@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "AGPL-3.0-or-later" }
 authors = [
-    { name = "RAEBYES Governance Team", email = "governance@raebyes.dev" }
+    { name = "Sourish Senapati", email = "sourishsenapati791@gmail.com" }
 ]
 keywords = ["ai-agents", "circuit-breaker", "scipy", "pytorch", "runtime-assertions", "guardrails"]
 classifiers = [
@@ -20,5 +20,5 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/raebyes/raebyes"
-Documentation = "https://raebyes.dev"
+Homepage = "https://github.com/SourishSenapati/RAEBYES"
+Repository = "https://github.com/SourishSenapati/RAEBYES"

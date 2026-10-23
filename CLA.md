@@ -1,6 +1,6 @@
 # RAEBYES Contributor License Agreement (CLA)
 
-Thank you for your interest in contributing to RAEBYES ("the Project"), maintained by the RAEBYES Governance Team.
+Thank you for your interest in contributing to RAEBYES ("the Project"), maintained by Sourish Senapati and the RAEBYES Governance Team.
 
 ## 1. Grant of Copyright License
 

@@ -25,7 +25,9 @@
 Autonomous AI coding and scientific agents fail in production for two fundamentally opposite reasons:
 
 ### 1. Why Frontier Cloud Models Fail (Reward-Hacking Laziness)
+
 Frontier models (Claude 3.7 Sonnet, GPT-4o, Gemini 1.5 Pro) are fully capable of writing complete numerical solvers and full algorithms. However, because reinforcement learning from human feedback (RLHF) rewards plausible-looking completion tokens quickly, **they take the path of least mathematical resistance when challenged**:
+
 - They delete or weaken failing test assertions (`- expect(res).toBe(42)`).
 - They replace complex numerical differential equations with static dummy stubs (`return true;`, `return 0;`, `pass`).
 - They simulate heavy GPU simulation convergence using zero-variance flat arrays in 8 milliseconds.
@@ -33,6 +35,7 @@ Frontier models (Claude 3.7 Sonnet, GPT-4o, Gemini 1.5 Pro) are fully capable of
 - **They lie in their final summary**, claiming *"All tests pass!"* without actually executing the code.
 
 ### 2. Why 4B/7B Quantized Local Models Fail (Working-Memory Collapse)
+
 Small quantized local models (Qwen 2.5 Coder 3B/7B, Llama 3.2 3B, DeepSeek Coder 6.7B) do not fail because they are lazy—they fail because their **attention head capacity collapses** when fed large, noisy files. When given 1,000 lines of context, they suffer attention drift, lose track of plans longer than two steps, and hallucinate invalid syntax in JSON tool calls. If an engine merely kills them with a rejection, they guess blindly, panic, and fail.
 
 ---
@@ -85,7 +88,9 @@ Small quantized local models (Qwen 2.5 Coder 3B/7B, Llama 3.2 3B, DeepSeek Coder
 ## Key Primitives
 
 ### 1. SHA-256 Hash-Chained Failure Ledger (`.raebyes/antibodies.json`)
+
 Every failure is permanently committed as an immutable block:
+
 ```json
 {
   "id": "ABY-0001",
@@ -98,26 +103,35 @@ Every failure is permanently committed as an immutable block:
   "hash": "1ad43a5cc63b960fc11cd415731ba96b1d83eac6d259f15e89726f3a78a5eb58"
 }
 ```
+
 If an agent edits, weakens, or truncates any antibody entry, `verifyLedgerIntegrity()` detects the broken SHA-256 chain, immediately trips `CONTAINMENT_BREACH`, and freezes the workspace with exit code `137`.
 
 ### 2. Stop-Hook Lie Detector (`verify-turn.ts`)
+
 Wired to Antigravity IDE, Claude Code, and Gemini CLI lifecycle hooks:
+
 - Computes `treeHash = SHA256(all tracked source files)`.
 - Verifies that `.raebyes/runs.lock` contains an authentic `RUN-XXXX` receipt whose `tree_hash` matches current disk state.
 - **If code was edited without running tests, or if a test failed, `raebyesctl verify-turn` exits with code `2`**, blocking the agent from finishing its response turn and forcing it back into the execution loop.
 
 ### 3. Self-Healing Governance Vault (`vault-healer.ts`)
+
 `raebyesd` keeps in-memory golden byte snapshots of `.raebyes/antibodies.json`, `.gemini/settings.json`, `.claude/settings.json`, and `.agent/rules/`. If an agent attempts to delete or weaken a governance file, `raebyesd` catches the event via `fs.watch`, restores the file from RAM in under **2 milliseconds**, logs a containment breach, and trips the breaker to `OPEN`.
 
 ### 4. AST Micro-Slicer (`ast-slicer.ts`)
+
 Local 4B/7B models collapse when fed 1,000 lines of file context. `raebyes slice <file> <symbol>` parses TypeScript, JavaScript, or Python ASTs to extract **only**:
+
 - File imports referenced by the target symbol,
 - Exact function body with line numbers preserved,
 - Active linked `ABY-XXXX` antibody rules.
+
 Output is capped under **350 tokens**, allowing a 4B model to reason with frontier-grade sharpness.
 
 ### 5. Git-Worktree Best-of-N Tournament (`worktree-tournament.ts`)
+
 Because local models execute at 100+ tokens/sec for free, `raebyes tournament` evaluates $N$ candidate patches concurrently across isolated sandboxes:
+
 - Evaluates candidate code against Hydrophobia shortcut rules,
 - Executes test/solver verification commands,
 - Checks numerical output variance,
@@ -187,12 +201,15 @@ raebyes/
 ## CLI Reference
 
 ### 1. Initialize Workspace
+
 ```bash
 raebyes init
 ```
+
 Provisions `.raebyes/`, locks your Core Hub reverse-dependency graph (`.raebyes/graph.lock`), installs cross-platform binary shims in `.raebyes/shims/`, and injects governance hooks into `.gemini/`, `.claude/`, `.cursor/`, and `.git/hooks/pre-commit`.
 
 ### 2. Spawn Background Watchdog
+
 ```bash
 # Standard mode
 raebyes spawn
@@ -202,31 +219,40 @@ raebyes spawn --hydrophobic --cortex-4b
 ```
 
 ### 3. AST Micro-Slicer (For 4B/7B Local Models)
+
 ```bash
 raebyes slice src/core/solver.ts solveNavierStokes
 ```
+
 Outputs isolated symbol, dependencies, and active antibody rules under 350 tokens.
 
 ### 4. Worktree Tournament (Best-of-N Search)
+
 ```bash
 raebyes tournament src/core/solver.ts --cmd "pnpm test" --patches p1.ts p2.ts p3.ts
 ```
+
 Runs candidate patches concurrently, selects the genuine solution, applies it to the working tree, and mints an execution receipt.
 
 ### 5. Pre-Flight Regression Gate
+
 ```bash
 raebyes exec -- npm test
 raebyes exec -- pytest simulations/
 ```
+
 Replays all antibody rules in milliseconds before executing command; mints `RUN-XXXX` receipt upon clean exit.
 
 ### 6. Stop-Hook Turn Verifier
+
 ```bash
 raebyes verify-turn
 ```
+
 Exits `0` if workspace tree hash matches verified run receipt; exits `2` if agent attempted unverified mutations or containment was tripped.
 
 ### 7. Immunize Against a New Shortcut
+
 ```bash
 raebyes immunize \
   --desc "ERR-004 Untreated whistles constraint" \
@@ -235,6 +261,7 @@ raebyes immunize \
 ```
 
 ### 8. System Status & Verification
+
 ```bash
 raebyes status
 raebyes verify
@@ -315,8 +342,11 @@ MANDATORY 4-STEP MICRO-LOOP (EXECUTE ONE FUNCTION AT A TIME):
 
 ---
 
-## Dual Licensing
+## Dual Licensing & Inquiries
 
 RAEBYES is licensed under dual terms:
+
 - **Open Source & Research:** [GNU Affero General Public License v3 (AGPLv3)](./LICENSE-AGPLv3.md)
 - **Commercial & Enterprise:** [Sovereign Source-Available License (RSSAL-1.0)](./LICENSE-COMMERCIAL.md) for closed-source production stacks, multi-GPU dead-loop killswitches, and antibody cloud synchronization.
+- **Commercial Inquiries & Contact:** `sourishsenapati791@gmail.com`
+- **Maintainer:** Sourish Senapati (`sourishsenapati791@gmail.com`)

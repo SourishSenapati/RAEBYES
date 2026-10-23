@@ -1,7 +1,7 @@
 GNU AFFERO GENERAL PUBLIC LICENSE
 Version 3, 19 November 2007
 
-Copyright (C) 2026 RAEBYES Governance Team <governance@raebyes.dev>
+Copyright (C) 2026 RAEBYES Governance Team & Sourish Senapati <sourishsenapati791@gmail.com>
 
 Everyone is permitted to copy and distribute verbatim copies
 of this license document, but changing it is not allowed.
